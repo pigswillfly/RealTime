@@ -1,0 +1,53 @@
+with Ada.Text_IO, Ada.Integer_Text_IO, Ada.Numerics.Float_Random;
+use Ada.Text_IO, Ada.Integer_Text_IO, Ada.Numerics.Float_Random;
+
+-- (Ada tabs = 3 spaces)
+
+procedure exercise7 is
+
+   Count_Failed : exception; -- Exception to be raised when counting fails
+   Gen : Generator; -- Random number generator
+
+   protected type Transaction_Manager (N : Positive) is
+      entry Finished;
+      function Commit return Boolean;
+      procedure Signal_Abort;
+   private
+      Finished_Gate_Open : Boolean := False;
+      Aborted : Boolean := False;
+      Will_Commit : Boolean := True;
+   end Transaction_Manager;
+   protected body Transaction_Manager is
+      entry Finished when Finished_Gate_Open or Finished'Count = N is
+      begin
+         ------------------------------------------
+         -- PART 3: Complete the exit protocol here
+         ------------------------------------------
+		if Finished'Count = N - 1 then
+			Finished_Gate_Open := True;
+			Will_Commit  := not Aborted;
+		end if;
+		if Finished'Count = 0 then
+			Finished_Gate_Open := False;
+			Aborted := False;
+		end if;
+	     
+      end Finished;
+
+      procedure Signal_Abort is
+      begin
+         Aborted := True;
+      end Signal_Abort;
+
+      function Commit return Boolean is
+      begin
+         return Will_Commit;
+      end Commit;
+      
+   end Transaction_Manager;
+
+
+
+   
+   function Unreliable_Slow_Add (x : Integer) return Integer is
+   Error_Rate : Const
