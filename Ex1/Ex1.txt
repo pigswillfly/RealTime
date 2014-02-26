@@ -1,0 +1,38 @@
+Exercise 1
+
+Elizabeth Roy
+Jon Kolstad
+
+Q3. Why concurrency?
+
+How can it make programming simpler?
+- It allows for doing a task multiple times. 
+
+How can it make it more difficult?
+- More susceptible to errors due to interconnectivity of threads and sharing of variables
+- More complicated programming
+
+What are the differences between processes, threads, green threads, and fibers?
+- Multiple threads can exist within a process, sharing resources
+- Multiple processes do not share resources
+- Green threads are those excuted in user space
+- Fibers are cooperatively scheduled units and do not require a kernel (system level)
+
+
+Which one of these do pthread_create() (C/POSIX), threading.Thread() (Python), go (Go) create?
+- They create threads.
+
+How does pythons  GIL influence the way a python Thread behaves?
+- It acts like mutex. Bottleneck?
+
+ What does func GOMAXPROCS(n int) int do?
+- It limits the number of threads at user level. 
+
+
+Q6. Four errors
+
+Error! i is 4294967295
+Error! i is 0
+Error! i is -1
+
+Two's complement?
