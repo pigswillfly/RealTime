@@ -1,0 +1,7 @@
+
+Theory
+
+Atomic operation - Indivisible task
+Semaphore - Controls access to resources. Could either have a counting or binary semaphore.
+Mutex - A binary semaphore associated with a certain resource. Enforces mutual exclusion
+Critical section - A section of code which requires the resource protected by a mutex
