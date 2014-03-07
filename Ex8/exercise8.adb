@@ -33,10 +33,11 @@ procedure exercise8 is
 
       entry Wait_Until_Aborted when Aborted=True is
       begin
-		if Finished'Count = N - 1 then
-			Aborted := True;
-		end if;
-		if Finished'Count = 0 then
+      
+--		if Wait_Until_Aborted'Count = N - 1 then
+	--		Aborted := True;
+		--end if;
+		if Wait_Until_Aborted'Count = 0 then
 			Aborted := False;
 		end if;
 	
@@ -86,23 +87,24 @@ procedure exercise8 is
          -- PART 2: Do the transaction work here
          ---------------------------------------
 			
-	select
-	Manager.Wait_Until_Aborted;
-	Put_Line (" Worker" & Integer'Image(Initial) & " aborting");
-	Num := Prev + 5;
-	then abort
- 		begin
-			Num := Unreliable_Slow_Add(Num);
-		exception
-		when Count_Failed =>
-			Manager.Signal_Abort;
-			Put_Line (" Worker" & Integer'Image(Initial) & " calling exception");
-		end;
-	end select;
+         select
+	      Manager.Wait_Until_Aborted;
+	      Put_Line (" Worker" & Integer'Image(Initial) & " aborting");
+	      Num := Prev + 5;
+	      then abort
+ 	      begin
+	         Num := Unreliable_Slow_Add(Num);
+	         exception
+	         when Count_Failed =>
+		         Manager.Signal_Abort;
+		         Put_Line (" Worker" & Integer'Image(Initial) & " calling exception");
+	         end;
+            Manager.Finished;
+	      end select;
 
-	Manager.Finished;
+
 		
-	Put_Line (" Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
+	      Put_Line (" Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
 
          Prev := Num;
          delay 0.5;
