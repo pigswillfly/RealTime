@@ -6,6 +6,10 @@ import (
     "C"
 )
 
+const N_BUTTONS = 3
+const N_FLOORS = 4
+
+
 var lamp_channel_matrix [][]int = [4][3]int{
     [3]int{LIGHT_UP1, LIGHT_DOWN1, LIGHT_COMMAND1},
     [3]int{LIGHT_UP2, LIGHT_DOWN2, LIGHT_COMMAND2},
@@ -17,15 +21,17 @@ var button_channel_matrix [][]int = [4][3]int{
     [3]int{FLOOR_UP2, FLOOR_DOWN2, FLOOR_COMMAND2},
     [3]int{FLOOR_UP3, FLOOR_DOWN3, FLOOR_COMMAND3},
     [3]int{FLOOR_UP4, FLOOR_DOWN4, FLOOR_COMMAND4}}
-    
+  
 const (
     BUTTON_CALL_UP int = 0
     BUTTON_CALL_DOWN int = 1
     BUTTON_COMMAND int = 2
 )
-   
 
 func elev_init() int{
+    // Initialize matrices
+    //matrix_init()
+
     // Initialize hardware
     if !IO_Init() {
         return 0
@@ -195,5 +201,4 @@ func set_door_open_light(value int){
         IO_Clear_Bit(DOOR_OPEN)
     }
 }
-
 
