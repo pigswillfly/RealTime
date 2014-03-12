@@ -1,4 +1,4 @@
-package channels
+package Driver
 
 const (
     PORT4 = 3 
@@ -52,10 +52,4 @@ const (
     FLOOR_UP4 = -1
     LIGHT_DOWN1 = -1
     LIGHT_UP4 = -1
-)
-
-const button_type_t(
-    BUTTON_CALL_UP = 0
-    BUTTON_CALL_DOWN = 1
-    BUTTON_COMMAND = 2
 )

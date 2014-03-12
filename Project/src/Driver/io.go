@@ -1,4 +1,4 @@
-package elevdriver
+package Driver
 
 /*
 #cgo LDFLAGS: -lcomedi -lm
