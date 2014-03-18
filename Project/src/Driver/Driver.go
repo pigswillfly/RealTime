@@ -1,8 +1,6 @@
 package Driver
 
-import (
-    "fmt"
-    "math"   
+import (   
     "C"
 )
 
@@ -21,17 +19,16 @@ var button_channel_matrix [][]int = [4][3]int{
     [3]int{FLOOR_UP2, FLOOR_DOWN2, FLOOR_COMMAND2},
     [3]int{FLOOR_UP3, FLOOR_DOWN3, FLOOR_COMMAND3},
     [3]int{FLOOR_UP4, FLOOR_DOWN4, FLOOR_COMMAND4}}
-  
+
+type button_type_t int
+
 const (
-    BUTTON_CALL_UP int = 0
-    BUTTON_CALL_DOWN int = 1
-    BUTTON_COMMAND int = 2
+    BUTTON_CALL_UP button_type_t = itoa
+    BUTTON_CALL_DOWN 
+    BUTTON_COMMAND
 )
 
 func elev_init() int{
-    // Initialize matrices
-    //matrix_init()
-
     // Initialize hardware
     if !IO_Init() {
         return 0
@@ -95,7 +92,7 @@ func get_floor_sensor_signal() int{
     }
 }
 
-func get_button_signal(button, floor int) int{
+func get_button_signal(button button_type_t, floor int) int{
     // Make sure floor is 0 or greater
     if floor < 0{
         return -1
@@ -157,7 +154,7 @@ func set_floor_indicator(floor int){
     }
 }
 
-func set_button_light(button, floor int, value int){
+func set_button_light(button button_type_t, floor int, value int){
     // Make sure floor is 0 or greater
     if floor < 0{
         return -1
