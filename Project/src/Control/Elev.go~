@@ -16,7 +16,6 @@ type Elevator struct {
 	floor int
 	alignment int
 	requests *List
-	other_requests *List
 	control_mesg chan string
 	alive chan string	
 }

@@ -10,5 +10,4 @@ func main() {
 	Driver.Set_Speed(300)
 	Sleep(Second)
 	Driver.Set_Speed(-300)
-	
 }

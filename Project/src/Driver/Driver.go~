@@ -195,7 +195,6 @@ func Set_Door_Open_Light(value int){
     if value == 1{
         IO_Set_Bit(DOOR_OPEN)
     } else{
-
         IO_Clear_Bit(DOOR_OPEN)
     }
 }
