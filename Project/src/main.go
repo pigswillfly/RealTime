@@ -1,14 +1,13 @@
 package main
 
 import (
-    "Driver"
+	"Testing"
 )
 
 
 func main() {
-	Driver.Elev_Init()
-	Driver.Set_Speed(300)
-	Sleep(Second)
-	Driver.Set_Speed(-300)
-	
+
+	Testing.Driver_test()	
 }
+
+

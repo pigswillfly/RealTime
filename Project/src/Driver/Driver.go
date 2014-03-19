@@ -52,6 +52,7 @@ func Elev_Init() int{
 } 
 
 func Set_Speed(speed int){
+	// TODO
     // To sharply stop elevator, direction bit is toggled before setting speed to 0
     last_speed := 0;
     

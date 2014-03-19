@@ -24,9 +24,9 @@ func New_Matrix(rows int, cols int) Matrix{
 }
 
 func (m *Matrix) Set(row int, col int, value int){
-	m.mat[row-1][col-1] = value
+	m.mat[row][col] = value
 }
 
 func (m *Matrix) Get(row int, col int) int{
-	return m.mat[row-1][col-1]
+	return m.mat[row][col]
 }

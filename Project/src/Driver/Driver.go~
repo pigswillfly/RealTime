@@ -51,7 +51,8 @@ func Elev_Init() int{
     
 } 
 
-func Set_Speed(speed int){
+func Set_Speed(speed int, last_speed int){
+	// TODO
     // To sharply stop elevator, direction bit is toggled before setting speed to 0
     last_speed := 0;
     
@@ -195,6 +196,7 @@ func Set_Door_Open_Light(value int){
     if value == 1{
         IO_Set_Bit(DOOR_OPEN)
     } else{
+
         IO_Clear_Bit(DOOR_OPEN)
     }
 }
