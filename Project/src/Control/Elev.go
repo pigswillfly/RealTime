@@ -20,6 +20,7 @@ type Elevator struct {
 	other_id int				
 	speed int			
 	direction int
+	other_dir int
 	floor int
 	alignment int
 	requests *List
@@ -47,14 +48,6 @@ func Init() *Elevator {
 	elev.requests = list.New()
 	elev.control_mesg = make(chan string, 30)
 	return e
-}
-
-func (elev *Elevator) Set_ID(id int){
-	e.id = id
-}
-
-func (elev *Elevator) Get_ID() int{
-	return e.id
 }
 
 func (elev *Elevator) Sync(){

@@ -14,6 +14,8 @@ type Control struct{
 	elevators *List				// list of other elevators
 	backup map[int]*List		// backup list of requests of other elev
 	costs map[int]int			// costs of other elevators referenced by id
+	tie map[int]int				// for tiebreakers, cost referened by id
+	timers map[int]int			// alive msg timers referenced by id
 	
 	net *Network				// network
 	toCtrlNet chan string		// TCP connection for control messages
@@ -61,12 +63,14 @@ func Control(){
 func (ctrl *Control) Send_Msg(id int, to int, code string, args []string){
 
 	// Make message comma delimited string
+	//	[Sender ID],[Receiver ID],[Code],[Arguments]
 	msg := Itoa(id) + "," + Itoa(to) + "," + code
 	for i:= range args {
 		if args[i] != ""{
 			msg += "," + args[i]
 		}
 	}
+	// Send to network
 	ctrl.toCtrlNet <- msg
 }
 
@@ -83,17 +87,28 @@ func (ctrl *Control) Recieve_Msg(){
 				// args -- button, floor
 				send_args[0] = Itoa(ctrl.elev.Cost(args[0],args[1])
 				Ctrl.Send_Msg(ctrl.elev.id, from_id, "MyCost", send_args)
+
 			case "MyCost":
 				// args -- cost
 				ctrl.costs[id] = args[0]	
 	
-			case "MyList":
-				// args -- floor requests
-				Update_List(from_id, args)
+			case "TieBreaker":
+				// args -- round, floor
+				send_args[0] = Itoa(ctrl.elev.TieBreaker(args[0], args[1]))
+				Ctrl.Send_Msg(ctrl.elev.id, from_id, "MyTie", send_args)
 
+			case "MyTie":
+				// args -- tiebreaker result
+				ctrl.tie[id] = args[0]
+				
 			case "ListPlease":
 				// no args
 				Send_List(from_id)
+
+			case "MyList":
+				// args -- direction, then floor requests
+				ctrl.elev.other_dir,_ = Atoi(args[0])
+				Update_List(from_id, args[1:])
 
 			case "AddFloor":
 				// args -- button, floor for request
@@ -102,6 +117,26 @@ func (ctrl *Control) Recieve_Msg(){
 		}
 	}
 }
+
+func (ctrl *Control) Set_Elev_ID(){
+	l *List = ctrl.elevators
+	ctrl.elev.id = l.Back()+1
+
+	// TODO possibly use socket ids for elevator ids somehow?
+}
+
+func (ctrl *Control) Set_Elev_Other_ID(){
+	l *List = ctrl.elevators
+	if ctrl.elev.id == l.Back(){
+		ctrl.elev.other_id = l.Front()
+	} else {
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			if ctrl.elev.id == i {
+				ctrl.elev.other_id = i.Next()
+			}		
+		}
+	}
+}	
 
 func (ctrl *Control) Decipher_Msg(msg string) (int, string, []string){
 	
@@ -117,7 +152,7 @@ func (ctrl *Control) Poll_Buttons(){
 		msg := <-ctrl.elev.msg
 		id, request := Decipher_Request(msg)
 		l *List = ctrl.elevators
-		for for i:=l.Front(); i!=nil; i=i.Next(){
+		for i:=l.Front(); i!=nil; i=i.Next(){
 			Send_Msg(id, i, "CostPlease", request)
 		}
 	}
@@ -136,6 +171,9 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 	// Send request for costs
 	// wait until all responses recieved
 	// use list of elevators to find lowest cost
+	// use tiebreaker if necessary
+	// find lowest cost
+	// send "AddFloor" message
 }
 
 func (ctrl *Control) Send_Alive_Msg(){
@@ -157,7 +195,14 @@ func (ctrl *Control) Rec_Alive_Msg(){
 		id,code,_ := Decipher_Msg(msg)
 		if code == "Alive" {
 			Update_Elevator_List(id)
+			// reset timer for that elevator
 		} else {
+			// error
+		}
+
+		// TODO
+		// Timers for detecting dead elevators
+}
 	}
 }
 
@@ -174,10 +219,8 @@ func (ctrl *Control) Update_Elevator_List(id int){
 	}
 	if found == 0 {
 		l.PushBack(id)
+		Set_Elev_Other_ID()
 	}
-
-	// TODO
-	// reallocate elev.other_id if adding new elevator
 }
 
 func (ctrl *Control) Update_List(id int, requests []string){
