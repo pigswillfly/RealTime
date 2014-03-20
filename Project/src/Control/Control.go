@@ -85,7 +85,7 @@ func (ctrl *Control) Recieve_Msg(){
 				Ctrl.Send_Msg(ctrl.elev.id, from_id, "MyCost", send_args)
 			case "MyCost":
 				// args -- cost
-				Ctrl.Add_Cost(id,args[0])
+				ctrl.costs[id] = args[0]	
 	
 			case "MyList":
 				// args -- floor requests
@@ -96,7 +96,9 @@ func (ctrl *Control) Recieve_Msg(){
 				Send_List(from_id)
 
 			case "AddFloor":
-				// args -- floor to add
+				// args -- button, floor for request
+				ctrl.elev.Add_Request(args[0], args[1])
+				
 		}
 	}
 }
@@ -111,18 +113,34 @@ func (ctrl *Control) Decipher_Msg(msg string) (int, string, []string){
 }
 
 func (ctrl *Control) Poll_Buttons(){
-	
+	for{
+		msg := <-ctrl.elev.msg
+		id, request := Decipher_Request(msg)
+		l *List = ctrl.elevators
+		for for i:=l.Front(); i!=nil; i=i.Next(){
+			Send_Msg(id, i, "CostPlease", request)
+		}
+	}
+}
+
+func (ctrl *Control) Decipher_Request(msg string) (int, []string){
+	substrings := SplitN(msg, ",", -1)
+	id,_ := Atoi(substrings[0])
+	args := substrings[1:]
+
+	return id, args
 }
 
 func (ctrl *Control) Decide_Elevator(button int, floor int){
-	// 
-}
-
-func (ctrl *Control) Add_Cost(id int, cost int){
-
+	// TODO
+	// Send request for costs
+	// wait until all responses recieved
+	// use list of elevators to find lowest cost
 }
 
 func (ctrl *Control) Send_Alive_Msg(){
+
+	// send alive message every time available in the alive channel
 	for {
 		msg := <-ctrl.elev.alive
 		ctrl.toAliveNet <-msg
@@ -130,26 +148,41 @@ func (ctrl *Control) Send_Alive_Msg(){
 }
 
 func (ctrl *Control) Rec_Alive_Msg(){
+
+	// if message available, receive message
 	for {
 		msg := <-ctrl.fromAliveNet
+
+		// decode
 		id,code,_ := Decipher_Msg(msg)
 		if code == "Alive" {
 			Update_Elevator_List(id)
 		} else {
 	}
-
-	// msg := <-ctrl.fromAliveNet
-	// get elevator id
-	// call Update_List
 }
 
 func (ctrl *Control) Update_Elevator_List(id int){
-	
+
+	// Search list of elevators, if not found, add 
+	found := 0
+	l *List = ctrl.elevators
+	for i:=l.Front(); i!=nil; i=i.Next(){
+		if i==id{
+			found = 1
+			break
+		}
+	}
+	if found == 0 {
+		l.PushBack(id)
+	}
+
+	// TODO
+	// reallocate elev.other_id if adding new elevator
 }
 
 func (ctrl *Control) Update_List(id int, requests []string){
 
-	if elevators[id] != nil{
+	if backup[id] != nil{
 		l *List
 		l.New()
 		req := -1
@@ -160,9 +193,6 @@ func (ctrl *Control) Update_List(id int, requests []string){
 			}
 		}
 	}
-	// search map of elevators
-	// if not there, add
-	// reallocate elev.other_id if adding new elevator
 }
 
 func (ctrl *Control) Send_List(to int){
