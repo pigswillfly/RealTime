@@ -4,8 +4,15 @@ import(
 	."Driver"
 	."fmt"
 	."time"
-	"container/list"
-//	"strconv"
+	."container/list"
+	."strconv"
+	."Helpers"
+)
+
+const (
+	up = 1
+	stop = 0
+	down = -1
 )
 
 type Elevator struct {
@@ -16,7 +23,6 @@ type Elevator struct {
 	floor int
 	alignment int
 	requests *List
-	other_requests *List
 	control_mesg chan string
 	alive chan string	
 }
@@ -102,11 +108,12 @@ func (elev *Elevator) Poll_Buttons(){
 				// if there is a request
 				if Get_Button_Signal(button, floor) == 1 {
 					if button == BUTTON_COMMAND{
-						// add request to queue
+						// add request to queue if command
 						elev.Add_Request(button, floor)
+					// otherwise send control message
 					} else {
 						//TODO control message
-						//elev.control_mesg = 
+						//msg := strconv(elev.id)+","+
 					}
 					Println("Button ",button," was pressed at floor ",floor)
 					new_button = button
@@ -128,7 +135,55 @@ func (elev *Elevator) Poll_Buttons(){
 	}
 }
 
-func (elev *Elevator) Cost(
+func (elev *Elevator) Cost(button int, floor int) int{
+
+	// if no requests in queue, or lift is at floor
+	if (elev.direction==0 || elev.requests.Len()==0 || elev.At(floor)){
+		return 0
+
+	// if elevator is passing floor and request is in same direction
+	} else if (elev.direction==down && elev.Above(floor) && button==down) ||
+		(elev.direction==up && elev.Below(floor)==1 && button==up){
+		return 1
+
+	// if elevator is passing floor and request is in opposite direction
+	} else if (elev.direction==down && elev.Above(floor) && button==up) ||
+		(elev.direction==up && elev.Below(floor)==1 && button==down){
+		return 2
+
+	// if request floor and direction are opposite to elevator direction
+	} else if (elev.direction==down && elev.Below(floor) && button==up) ||
+		(elev.direction==up && elev.Above(floor)==1 && button==down){
+		return 3
+
+	// if request and elevator direction are same but floor already passed
+	} else if (elev.direction==down && elev.Below(floor) && button==down) ||
+		(elev.direction==up && elev.Above(floor) && button==up)
+		return 4
+
+	// error
+	} else {
+		return -1
+	}
+}
+
+func (elev *Elevator) Tie_Breaker(round int, floor int) int{
+	if round==1{
+		return elev.requests.Len()
+	} else if round==2{
+		return elev.floor - floor
+	}
+}
+
+func (elev *Elevator) Above(floor int) bool{
+	return floor < e.floor
+}
+func (elev *Elevator) Below(floor int) bool{
+	return floor > e.floor
+}
+func (elev *Elevator) At(floor int) bool{
+	return floor == e.floor
+}
 
 func (elev *Elevator) Add_Request(button int, floor int) int {
 	// returns 0 on success, -1 failure
@@ -255,51 +310,12 @@ func (elev *Elevator) Run(){
 		
 		// sort requests in terms of direction 
 		if dir != elev.direction {
-			elev.Sort_Queue()
+			Sort_Queue(elev.direction,elev.requests)
 		}
 	}
 }
 
-func (elev *Elevator) Sort_Queue(){
-	l *List = elev.requests
-	dir := elev.direction
-	var temp int
-	for i:=l.Front(); i!=nil; i=i.Next(){
-		for j:=l.Back(); j!=i; j=j.Prev(){
-			if dir < 0 {
-				// Max first
-				if i.Value < j.Value {
-					// Swap		
-					if i.Prev() != nil{
-						temp = i.Prev()
-						l.MoveAfter(i,j)
-						l.MoveAfter(j,temp)
-					} else if i.Next() != nil {
-						temp = i.Next()
-						l.MoveAfter(i,j)
-						l.MoveBefore(j,temp)f
-					}
-					break
-				}
-			} else {
-				// Min first
-				if i.Value > j.Value {
-					// Swap
-					if i.Prev() != nil{
-						temp = i.Prev()
-						l.MoveAfter(i,j)
-						l.MoveAfter(j,temp)
-					} else if i.Next() != nil {
-						temp = i.Next()
-						l.MoveAfter(i,j)
-						l.MoveBefore(j,temp)
-					}
-					break
-				}
-			}
-		}
-	} 
-}
+
 
 
 

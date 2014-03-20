@@ -11,7 +11,6 @@ const (
 
 type Control struct{
 	elev *Elevator				// elevator
-	elevators *List				// list of other elevators
 	backup map[int]*List		// backup list of requests of other elev
 	costs map[int]int			// costs of other elevators referenced by id
 	
@@ -134,17 +133,13 @@ func (ctrl *Control) Rec_Alive_Msg(){
 		msg := <-ctrl.fromAliveNet
 		id,code,_ := Decipher_Msg(msg)
 		if code == "Alive" {
-			Update_Elevator_List(id)
+			Update_List(id)
 		} else {
 	}
 
 	// msg := <-ctrl.fromAliveNet
 	// get elevator id
 	// call Update_List
-}
-
-func (ctrl *Control) Update_Elevator_List(id int){
-	
 }
 
 func (ctrl *Control) Update_List(id int, requests []string){
@@ -159,6 +154,7 @@ func (ctrl *Control) Update_List(id int, requests []string){
 				l.PushBack(i)
 			}
 		}
+			
 	}
 	// search map of elevators
 	// if not there, add
@@ -177,6 +173,7 @@ func (ctrl *Control) Send_List(to int){
 	Ctrl.Send_Msg(ctrl.elev.id, to, "MyList", send_args)
 
 }
+
 
 
 
