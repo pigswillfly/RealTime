@@ -85,6 +85,7 @@ func (ctrl *Control) Recieve_Msg(){
 		msg := <-ctrl.net.FromNet
 		from_id, to_id, code, args := ctrl.Decipher_Msg(msg)
 		var send_args []string
+		var i,j int
 
 		if code == "Alive"{
 			ctrl.Rec_Alive_Msg(from_id)
@@ -96,22 +97,28 @@ func (ctrl *Control) Recieve_Msg(){
 				switch code{
 					case "CostPlease":
 						// args -- button, floor
-						send_args[0] = Itoa(ctrl.elev.Cost(Atoi(args[0]),Atoi(args[1])))
+						i,_ = Atoi(args[0])
+						j,_ = Atoi(args[1])
+						send_args[0] = Itoa(ctrl.elev.Cost(i,j))
 						ctrl.Send_Msg(ctrl.elev.id, from_id, "MyCost", send_args)
 
 					case "MyCost":
 						// args -- cost
-						ctrl.costs[from_id] = Atoi(args[0])
+						i,_ = Atoi(args[0])
+						ctrl.costs[from_id] = i
 						ctrl.cost_res += 1	
 	
 					case "TieBreaker":
 						// args -- round, floor
-						send_args[0] = Itoa(ctrl.elev.Tie_Breaker(Atoi(args[0]), Atoi(args[1])))
+						i,_ = Atoi(args[0])
+						j,_ = Atoi(args[1])				
+						send_args[0] = Itoa(ctrl.elev.Tie_Breaker(i, j))
 						ctrl.Send_Msg(ctrl.elev.id, from_id, "MyTie", send_args)
 
 					case "MyTie":
 						// args -- tiebreaker result
-						ctrl.tie[from_id] = Atoi(args[0])
+						i,_ = Atoi(args[0])
+						ctrl.tie[from_id] = i
 						ctrl.tie_res += 1
 				
 					case "ListPlease":
@@ -125,7 +132,9 @@ func (ctrl *Control) Recieve_Msg(){
 
 					case "AddFloor":
 						// args -- button, floor for request
-						ctrl.elev.Add_Request(Atoi(args[0]), Atoi(args[1]))		
+						i,_ = Atoi(args[0])
+						j,_ = Atoi(args[1])			
+						ctrl.elev.Add_Request(i, j)		
 				
 				}
 			}
@@ -137,7 +146,7 @@ func (ctrl *Control) Send_Pulse(){
 
 	// send alive message every time available in the alive channel
 	for {
-		msg := <-ctrl.elev.alive
+		msg := <-ctrl.elev.Alive
 		ctrl.net.ToNet <- msg
 	}
 }
@@ -152,7 +161,7 @@ func (ctrl *Control) Rec_Alive_Msg(id int){
 
 func (ctrl *Control) Poll_Buttons(){
 	for{
-		msg := <-ctrl.elev.msg
+		msg := <-ctrl.elev.Msg
 		id, _, code, request := ctrl.Decipher_Msg(msg)
 		if code == "Request"{
 			ctrl.cost_res = 0
@@ -234,7 +243,7 @@ func (ctrl *Control) Reset_Timer(id int){
 			<-ctrl.timers[id].C
 			ctrl.Timer_Expired(id)
 		}()
-		stop:= ctrl.timers[id].Stop()
+		ctrl.timers[id].Stop()
 }
 
 func (ctrl *Control) Timer_Expired(id int){

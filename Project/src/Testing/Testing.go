@@ -2,17 +2,28 @@ package Testing
 
 import(
 	"Driver"
+	"Network"
 	"time"
 	."fmt"
 )
 
 const (
-	up = 100
-	down = -100
+	up = 150
+	down = -150
 	stop = 0
 )
 
-func Driver_test(){
+func Network_Test(){
+	net := Network.Init_Net()
+	msg := "Hello World!"
+	var message string
+	net.ToNet <- msg
+	time.Sleep(2*time.Second)
+	message = <-net.FromNet
+	Println(message)
+}
+
+func Driver_Test(){
 	Driver.Elev_Init()
 
 	Println("Testing motor and floor indicators\n")
@@ -82,8 +93,6 @@ func Driver_test(){
 	Driver.Set_Floor_Indicator(Driver.Get_Floor_Sensor_Signal())
 	time.Sleep(time.Millisecond*2000)
 
-//	Driver.Set_Speed(stop)
-/*
 	Println("Testing door open light\n")
 	Driver.Set_Door_Open_Light(1)
 	time.Sleep(time.Millisecond*2000)
@@ -133,5 +142,7 @@ func Driver_test(){
 	Driver.Set_Button_Light(2,2,0)
 	time.Sleep(time.Millisecond*500)
 	Driver.Set_Button_Light(2,3,0)
-*/
+
 }
+
+

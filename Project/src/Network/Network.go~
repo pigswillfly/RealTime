@@ -40,7 +40,7 @@ func (net *Network) SendUDP() {
 	}
 
 	for {
-		msg := <-net.toNet
+		msg := <-net.ToNet
 		buf = []byte(msg)
 		rconn.Write([]byte(buf))
 		time.Sleep(time.Millisecond * 5) // Change frequency here.

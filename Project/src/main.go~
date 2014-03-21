@@ -1,16 +1,17 @@
 package main
 
 import (
-//	"Testing"
-	"Control"
+	"Testing"
+//	."Control"
+	
 )
 
 
 func main() {
 
-//	Testing.Driver_test()	
-	ctrl := new(Control)
-	ctrl.Init_Contrl()
+//	Testing.Driver_Test()
+	Testing.Network_Test()	
+//	ctrl := Init_Control()
 	for{}
 }
 

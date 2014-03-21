@@ -28,8 +28,8 @@ type Elevator struct {
 	floor int
 	alignment int
 	requests *List
-	msg chan string
-	alive chan string	
+	Msg chan string
+	Alive chan string	
 }
 
 func Init_Elev() *Elevator {
@@ -56,22 +56,22 @@ func Init_Elev() *Elevator {
 			}
 		}
 	}
-	elev.requests = list.New()
-	elev.control_mesg = make(chan string, channelSize)
+	elev.requests = new(List)
+	elev.Msg = make(chan string, channelSize)
 
 	go elev.Pulse()
 //	go elev.Get_Stats()
 	go elev.Run()
 	go elev.Poll_Buttons()
 
-	return e
+	return elev
 }
 
-func (elev *Elevator) Pulse{
+func (elev *Elevator) Pulse(){
 	for{
 		msg := Itoa(elev.id)+",0,Alive"
-		elev.alive <- msg
-		Sleep(0.5*Second)
+		elev.Alive <- msg
+		Sleep(500*Millisecond)
 	}
 }
 
@@ -81,8 +81,8 @@ func (elev *Elevator) Run(){
 
 	for{
 		// get next floor as destination
-		dest := elev.requests.Front().Value
-		if dest == nil{
+		dest := elev.requests.Front().Value.(int)
+		if elev.requests.Front() == nil{
 			dest = -1
 		}
 
@@ -91,7 +91,7 @@ func (elev *Elevator) Run(){
 			Set_Floor_Indicator(elev.floor)
 		}
 
-		dir = elev.direction
+		dir := elev.direction
 
 		if dest == -1{
 			elev.direction = 0
@@ -118,10 +118,10 @@ func (elev *Elevator) Run(){
 
 			// button lights
 			// if destination is lower than next request
-			if dest < elev.requests.Front().Value {
+			if dest < elev.requests.Front().Value.(int) {
 				Set_Button_Light(BUTTON_CALL_UP, dest, 0)
 			// if destination is higher than next request
-			} else if dest > elev.requests.Front().Value {
+			} else if dest > elev.requests.Front().Value.(int) {
 				Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
 			// otherwise
 			} else {
@@ -195,8 +195,8 @@ func (elev *Elevator) Poll_Buttons(){
 					// otherwise send control message
 					} else {
 						// control message
-						msg := elev.id+",0,Request,"+Itoa(button)+","+Itoa(floor)
-						elev.msg <- msg
+						msg := Itoa(elev.id)+",0,Request,"+Itoa(button)+","+Itoa(floor)
+						elev.Msg <- msg
 					}
 					Println("Button ",button," was pressed at floor ",floor)
 					new_button = button
@@ -246,7 +246,7 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 		for i:=l.Front(); i!=nil; i=i.Next() {
 			// if current value is higher than request
 			// & request is higher than current floor
-			if i.Value > floor && floor > elev.floor {
+			if i.Value.(int) > floor && floor > elev.floor {
 				// if call down break and restart
 				if button == BUTTON_CALL_DOWN {
 					// next iteration of request queue loop
@@ -265,7 +265,7 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 		for i:= l.Front(); i!=nil; i=i.Next() {
 			// if current value is lower than request
 			// & request is lower than current floor
-			if i.Value < floor & floor > elev.floor {
+			if (i.Value.(int) < floor) && (floor > elev.floor) {
 				// if call up break and restart
 				if button == BUTTON_CALL_UP{
 					// next iteration of request queue loop
@@ -289,22 +289,22 @@ func (elev *Elevator) Cost(button int, floor int) int{
 
 	// TODO check if direction changes when servicing a floor (open/close doors)
 	// if no requests in queue, or lift is at floor
-	if (elev.direction==0 || elev.requests.Len()==0 || elev.At(floor)){
+	if (elev.direction==stop || elev.requests.Len()==0 || elev.At(floor)){
 		return 0
 
 	// if elevator is passing floor and request is in same direction
 	} else if (elev.direction==down && elev.Above(floor) && button==down) ||
-		(elev.direction==up && elev.Below(floor)==1 && button==up){
+		(elev.direction==up && elev.Below(floor) && button==up){
 		return 1
 
 	// if elevator is passing floor and request is in opposite direction
 	} else if (elev.direction==down && elev.Above(floor) && button==up) ||
-		(elev.direction==up && elev.Below(floor)==1 && button==down){
+		(elev.direction==up && elev.Below(floor) && button==down){
 		return 2
 
 	// if request floor and direction are opposite to elevator direction
 	} else if (elev.direction==down && elev.Below(floor) && button==up) ||
-		(elev.direction==up && elev.Above(floor)==1 && button==down){
+		(elev.direction==up && elev.Above(floor) && button==down){
 		return 3
 
 	// if request and elevator direction are same but floor already passed
@@ -322,7 +322,9 @@ func (elev *Elevator) Tie_Breaker(round int, floor int) int{
 	if round==1{
 		return elev.requests.Len()
 	} else if round==2{
-		return Abs(elev.floor - floor)
+		return int(Abs(float64(elev.floor - floor)))
+	} else {
+		return 100
 	}
 }
 
