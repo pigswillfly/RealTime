@@ -303,7 +303,7 @@ func (ctrl *Control) Send_List(to int){
 		send_args[j] = Itoa(i.Value.(int))
 		j++
 	}
-	ctrl.Send_Msg(ctrl.elev.id, to, "MyList", send_args)
+	Ctrl.Send_Msg(ctrl.elev.id, to, "MyList", send_args)
 
 }
 
