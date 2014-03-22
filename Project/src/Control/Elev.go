@@ -79,7 +79,7 @@ func (elev *Elevator) Pulse(){
 	for{
 		msg := Itoa(elev.ID)+",0,Alive"
 		elev.Alive <- msg
-		Sleep(500*Millisecond)
+		Sleep(5*Second)
 	}
 }
 
@@ -114,6 +114,7 @@ func (elev *Elevator) Run(){
 				break
 			// otherwise
 			} else if Get_Floor_Sensor_Signal() != -1 && Get_Floor_Sensor_Signal() == dest{
+				Println("inside")
 				// stop elevator
 				elev.Stop()
 				elev.direction = 0
@@ -123,11 +124,11 @@ func (elev *Elevator) Run(){
 				msg := Itoa(elev.ID)+",0,Handled"
 				elev.Msg <- msg
 
-				// door open light
+/*				// door open light
 				Set_Door_Open_Light(1)
 				Sleep(2*Second)
 				Set_Door_Open_Light(0)
-
+*/
 				// button lights
 				if elev.requests.Len() > 0{
 					// if destination is lower than next request

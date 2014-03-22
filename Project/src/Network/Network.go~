@@ -35,16 +35,12 @@ func (net *Network) SendUDP() {
 	if err != nil {
 		Println("Resolving address failed.")
 		os.Exit(-1)
-	} else {
-		Println("Broadcast address resolved")
-	}
+	} 
 	rconn, err := DialUDP("udp", nil, raddr)
 	if err != nil {
 		Println("UDP dialup failed.")
 		os.Exit(-2)
-	} else {
-		Println("Broadcast dialup successful")
-	}
+	} 
 
 	for {
 		msg := <-net.ToNet
@@ -65,17 +61,13 @@ func (net *Network) ReadUDP() {
 	if err != nil {
 		Println("Resolving address failed.")
 		os.Exit(-3)
-	} else {
-		Println("Listen address resolved")
 	}
 
 	lconn, err := ListenUDP("udp", laddr)
 	if err != nil {
 		Println("UDP listener failed to establish.")
 		os.Exit(-4)
-	} else {
-		Println("Listen established")
-	}
+	} 
 
 	for {
 		 n, _ = lconn.Read(buf)

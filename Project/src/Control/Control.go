@@ -7,6 +7,7 @@ import(
 	."time"
 	."strings"
 	."Network"
+	."Helpers"
 )
 
 const (
@@ -52,17 +53,20 @@ func Init_Control() *Control{
 	ctrl.net = Init_Net(ctrl.toNet, ctrl.fromNet)
 	Println("Network established")
 
-	// Find which elevators are present ("Alive" messages receiving)
-	Println("Finding friends")
-	go ctrl.Recieve_Msg()
-	// Wait
-	Sleep(Second)
-	Println(Itoa(ctrl.friends)+" friends found")
-
 	// Set up elevator
 	ctrl.ElevMsg = make(chan string, chanSize)
 	ctrl.ElevAlive = make(chan string, chanSize)
 	ctrl.elev = Init_Elev(ctrl.ElevMsg, ctrl.ElevAlive)
+	Println("Elevator Initialized")
+
+	// Find which elevators are present ("Alive" messages receiving)
+	Println("Finding friends")
+	go ctrl.Recieve_Msg()
+	// Wait
+	Sleep(10*Second)
+	Println(Itoa(ctrl.friends)+" friends found")
+
+	// Set own ID
 	ctrl.Set_Elev_ID()
 
 	// Set up alive message pulse
@@ -74,6 +78,7 @@ func Init_Control() *Control{
 	// Start elevator
 	go ctrl.elev.Update_Floor()
 	go ctrl.elev.Poll_Buttons()
+	go ctrl.elev.Print_Requests()
 	go ctrl.elev.Run()
 
 	return ctrl
@@ -110,15 +115,14 @@ func (ctrl *Control) Recieve_Msg(){
 		// Message format:
 		//	[Sender ID],[Receiver ID],[Code],[Arguments]
 		msg := <-ctrl.net.FromNet
+		Println("Message received: "+msg)
 		from_id, to_id, code, args := ctrl.Decipher_Msg(msg)
-		var send_args []string
+		send_args := make([]string,2)
 		var i,j int
 
 		if code == "Alive"{
-			if from_id != ctrl.elev.ID{
-				ctrl.Rec_Alive_Msg(from_id)
-			}
-		} else{
+			ctrl.Rec_Alive_Msg(from_id)
+		} else {
 		// check received ID against own
 			if to_id == ctrl.elev.ID{
 				// action according to code
@@ -132,7 +136,8 @@ func (ctrl *Control) Recieve_Msg(){
 						ctrl.Send_Msg(ctrl.elev.ID, from_id, "MyCost", send_args)
 
 					case "MyCost":
-						// args -- cost
+						// args -- cost	
+						Println("Cost Received")
 						i,_ = Atoi(args[0])
 						ctrl.costs[from_id] = i
 						ctrl.cost_res += 1	
@@ -152,16 +157,19 @@ func (ctrl *Control) Recieve_Msg(){
 				
 					case "ListPlease":
 						// no args
+						Println("Requesting backup request list")
 						ctrl.Send_List(from_id)
 						ctrl.elev.other_id = from_id
 
 					case "MyList":
 						// args -- direction, then floor requests
 						ctrl.elev.backup_dir,_ = Atoi(args[0])
+						Println("Sending list of requests for backup")
 						ctrl.Update_List(from_id, args[1:])
 
 					case "AddFloor":
 						// args -- button, floor for request
+						Println("Adding floor")
 						i,_ = Atoi(args[0])
 						j,_ = Atoi(args[1])			
 						ctrl.elev.Add_Request(i, j)		
@@ -186,7 +194,7 @@ func (ctrl *Control) Send_Alive_Msg(){
 func (ctrl *Control) Rec_Alive_Msg(id int){
 	
 	ctrl.Update_Elevator_List(id)
-//	go ctrl.Reset_Timer(id)
+	go ctrl.Reset_Timer(id)
 
 }
 
@@ -207,78 +215,94 @@ func (ctrl *Control) Rec_Elev_Msg(){
 func (ctrl *Control) New_Request(request []string){
 	button,_ := Atoi(request[0])
 	floor,_ := Atoi(request[1])
-	if ctrl.friends == 0{
+	if ctrl.friends == 0 {
 		ctrl.elev.Add_Request(button,floor)
 	} else {
 		ctrl.costs[ctrl.elev.ID] = ctrl.elev.Cost(button,floor)
 		ctrl.cost_res = 1
 		l := ctrl.elevators
 		for i:=l.Front(); i!=nil; i=i.Next(){
+			if i.Value.(int) == ctrl.elev.ID {
+				continue
+			}
 			ctrl.Send_Msg(ctrl.elev.ID, i.Value.(int), "CostPlease", request)
 		}
+		ctrl.Decide_Elevator(button,floor)
 	}
 }
 
 func (ctrl *Control) Decide_Elevator(button int, floor int){
-	l := ctrl.elevators
-	best_id := l.Front().Value.(int)
-	best := ctrl.costs[best_id]
-	best_tie := -1
-	var args []string
-
 	for{
-		// if all responses received
-		if ctrl.cost_res == ctrl.friends+1{
-			// find best
-			for i:=l.Front(); i!=nil; i=i.Next(){
-				if i==l.Front(){
-					continue
-				} else {
-					if ctrl.costs[i.Value.(int)] < best {	
-						best_id = i.Value.(int)
-						best = ctrl.costs[best_id]
-						best_tie = -1
-					} else if ctrl.costs[i.Value.(int)] == best{
-						best_tie = i.Value.(int)
+		if ctrl.costs[ctrl.elev.ID] == 0{
+			ctrl.elev.Add_Request(button,floor)	
+		} else {
+			l := ctrl.elevators
+			best_id := l.Front().Value.(int)
+			best := ctrl.costs[best_id]
+//			best_tie := -1
+			args := make([]string,2)
+			// if all responses received
+			if ctrl.cost_res == ctrl.friends+1{
+				// find best
+				for i:=l.Front(); i!=nil; i=i.Next(){
+					if i==l.Front(){
+						continue
+					} else {
+						if ctrl.costs[i.Value.(int)] < best {	
+							best_id = i.Value.(int)
+							best = ctrl.costs[best_id]
 					}
 				}
 			}
-			// tiebreaker
-			if best_tie != -1{
-				// round 1
-				args[0] = Itoa(1)
-				args[1] = Itoa(floor)
-				ctrl.tie_res = 0
-				ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
-				ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
-				for {
-					if ctrl.tie_res == 2 {
-						if ctrl.tie[best_id] > ctrl.tie[best_tie]{
-							best_id = best_tie
-							break
-						} else if ctrl.tie[best_id] == ctrl.tie[best_tie]{
-							// round 2
-							args[0] = Itoa(2)
-							ctrl.tie_res = 0
-							ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
-							ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
-							for {
-								if ctrl.tie_res == 2 {
-									if ctrl.tie[best_id] > ctrl.tie[best_tie]{
-										best_id = best_tie
-										break
-									}
-									break
-								}
-							}
-							break
+/*							best_tie = -1
+						} else if ctrl.costs[i.Value.(int)] == best{
+							best_tie = i.Value.(int)
 						}
 					}
 				}
+				// tiebreaker
+				if best_tie != -1{
+					// round 1
+					args[0] = Itoa(1)
+					args[1] = Itoa(floor)
+					ctrl.tie_res = 0
+					ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
+					ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
+					for {
+						if ctrl.tie_res == 2 {
+							if ctrl.tie[best_id] > ctrl.tie[best_tie]{
+								best_id = best_tie
+								break
+							} else if ctrl.tie[best_id] == ctrl.tie[best_tie]{
+								// round 2
+								args[0] = Itoa(2)
+								ctrl.tie_res = 0
+								ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
+								ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
+								for {
+									if ctrl.tie_res == 2 {
+										if ctrl.tie[best_id] > ctrl.tie[best_tie]{
+											best_id = best_tie
+											break
+										}
+										break
+									}
+								}
+								break
+							}
+						}
+					}
+				}
+*/				// Send message to selected elevator
+				if best_id == ctrl.elev.ID {
+					ctrl.elev.Add_Request(button,floor)
+				} else {
+					args[0] = Itoa(button)
+					args[1] = Itoa(floor)
+					ctrl.Send_Msg(ctrl.elev.ID, best_id, "AddFloor", args)
+				}
+				break
 			}
-			// Send message to selected elevator
-			ctrl.Send_Msg(ctrl.elev.ID, best_id, "AddFloor", args)
-			break
 		}	
 	}
 }
@@ -323,12 +347,17 @@ func (ctrl *Control) Timer_Expired(id int){
 func (ctrl *Control) Set_Elev_ID(){
 
 	l := ctrl.elevators
+	prev := ctrl.elev.ID
 	if l.Back() == nil{
 		ctrl.elev.ID = 1
 	} else {
 		ctrl.elev.ID = l.Back().Value.(int) + 1
 	}
 	Println("Elevator ID set to: "+Itoa(ctrl.elev.ID))
+	if prev == -1{
+		ctrl.Update_Elevator_List(ctrl.elev.ID)
+		ctrl.Set_Elev_Backup_ID()
+	}
 }
 
 func (ctrl *Control) Set_Elev_Backup_ID(){
@@ -367,7 +396,11 @@ func (ctrl *Control) Update_Elevator_List(id int){
 	if found == 0 {
 		ctrl.friends += 1
 		l.PushBack(id)
-		ctrl.Set_Elev_Backup_ID()
+		ctrl.elevators = l
+		Sort_Queue(minFirst, ctrl.elevators)
+		if ctrl.elev.ID != -1{
+			ctrl.Set_Elev_Backup_ID()
+		}
 	}
 }
 

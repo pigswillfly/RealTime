@@ -78,15 +78,4 @@ func (net *Network) ReadUDP() {
 
 }
 
-/*for {
-	select{
-	case newOrder := <-newOrderChan:
-		//Handle new order
-	case someoneRequestsSomethingChan<- something:
-	case <-closeChan:
-		return
-	default:
-		// do something
-	}
-	
-}*/
+

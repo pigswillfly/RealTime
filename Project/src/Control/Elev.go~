@@ -18,7 +18,7 @@ const (
 	upSpeed = 300
 	downSpeed = -300
 	channelSize = 100
-	stopWait = 200*Millisecond
+	StopWait = 200*Millisecond
 )
 
 type Elevator struct {
@@ -79,7 +79,7 @@ func (elev *Elevator) Pulse(){
 	for{
 		msg := Itoa(elev.ID)+",0,Alive"
 		elev.Alive <- msg
-		Sleep(500*Millisecond)
+		Sleep(5*Second)
 	}
 }
 
@@ -123,11 +123,11 @@ func (elev *Elevator) Run(){
 				msg := Itoa(elev.ID)+",0,Handled"
 				elev.Msg <- msg
 
-				// door open light
+/*				// door open light
 				Set_Door_Open_Light(1)
 				Sleep(2*Second)
 				Set_Door_Open_Light(0)
-
+*/
 				// button lights
 				if elev.requests.Len() > 0{
 					// if destination is lower than next request
