@@ -8,15 +8,17 @@ import(
 	."strconv"
 	."Helpers"
 	."math"
+	."strings"
 )
 
 const (
 	up = 1
 	stop = 0
 	down = -1
-	upSpeed = 150
-	downSpeed = -150
+	upSpeed = 300
+	downSpeed = -300
 	channelSize = 100
+	stopWait = 200*Millisecond
 )
 
 type Elevator struct {
@@ -47,17 +49,18 @@ func Init_Elev(msg chan string, alive chan string) *Elevator {
 	// set up parameters
 	elev.ID = -1
 	elev.backup_id = -1
+	elev.other_id = -1
 	elev.speed = Set_Speed(stop)
 
 	elev.direction = 0
 	elev.alignment = Get_Floor_Sensor_Signal()
 
-	if elev.alignment != 0{
+	if elev.alignment == -1{
 		for{
 			elev.speed = Set_Speed(downSpeed)
 			elev.alignment = Get_Floor_Sensor_Signal()
-			if elev.alignment == 0{
-				elev.speed = Set_Speed(stop)
+			if elev.alignment != -1{
+				elev.Stop()
 				break
 			}
 		}
@@ -83,71 +86,75 @@ func (elev *Elevator) Pulse(){
 func (elev *Elevator) Run(){
 	Println("Elevator Running")
 	l := elev.requests
+	dest := -1
 
 	for{
-		// get next floor as destination
-		dest := elev.requests.Front().Value.(int)
-		if elev.requests.Front() == nil{
-			dest = -1
-		}
+		// If no requests...
+		if elev.requests.Len() > 0{
+			dest = elev.requests.Front().Value.(int)
 
-		// set floor light
-		if elev.alignment != -1{
-			Set_Floor_Indicator(elev.floor)
-		}
+			dir := elev.direction
 
-		dir := elev.direction
-
-		// if no requests, stop
-		if dest == -1{
-			elev.direction = stop
-		// if elevator above destination
-		} else if elev.floor > dest {
-			// set direction down
-			elev.direction = down
-			elev.speed = Set_Speed(downSpeed)
-		// if elevator below destination
-		} else if elev.floor < dest {
-			// set direction up
-			elev.direction = up
-			elev.speed = Set_Speed(upSpeed)
-		// if stop signal, stop
-		} else if Get_Stop_Signal() {
-			elev.speed = Set_Speed(stop)
-			break
-		// otherwise
-		} else {
-			// stop elevator
-			elev.speed = Set_Speed(stop)
-			// remove request from queue
-			elev.requests.Remove(l.Front())
-			// send control message
-			msg := Itoa(elev.ID)+",0,Handled"
-			elev.Msg <- msg
-
-			// button lights
-			// if destination is lower than next request
-			if dest < elev.requests.Front().Value.(int) {
-				Set_Button_Light(BUTTON_CALL_UP, dest, 0)
-			// if destination is higher than next request
-			} else if dest > elev.requests.Front().Value.(int) {
-				Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
+			// if no requests, stop
+			if dest == -1{
+				elev.direction = stop
+			// if elevator above destination
+			} else if Get_Floor_Sensor_Signal() != -1 && Get_Floor_Sensor_Signal() > dest {
+				// set direction down
+				elev.direction = down
+				elev.speed = Set_Speed(downSpeed)
+			// if elevator below destination
+			} else if Get_Floor_Sensor_Signal() != -1 && Get_Floor_Sensor_Signal() < dest {
+				// set direction up
+				elev.direction = up
+				elev.speed = Set_Speed(upSpeed)
+			// if stop signal, stop
+			} else if Get_Stop_Signal() == 1{
+				elev.Stop()
+				break
 			// otherwise
-			} else {
-				Set_Button_Light(BUTTON_CALL_UP, dest, 0)
-				Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
+			} else if Get_Floor_Sensor_Signal() != -1 && Get_Floor_Sensor_Signal() == dest{
+				// stop elevator
+				elev.Stop()
+				elev.direction = 0
+				// remove request from queue
+				elev.requests.Remove(l.Front())
+				// send control message
+				msg := Itoa(elev.ID)+",0,Handled"
+				elev.Msg <- msg
+
+				// door open light
+				Set_Door_Open_Light(1)
+				Sleep(2*Second)
+				Set_Door_Open_Light(0)
+
+				// button lights
+				if elev.requests.Len() > 0{
+					// if destination is lower than next request
+					if dest < elev.requests.Front().Value.(int) {
+						Set_Button_Light(BUTTON_CALL_UP, dest, 0)
+					// if destination is higher than next request
+					} else if dest > elev.requests.Front().Value.(int) {
+						Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
+					} 
+				// otherwise
+				} else {
+					Set_Button_Light(BUTTON_CALL_UP, dest, 0)
+					Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
+				}
+
+				// turn off command light
+				Set_Button_Light(BUTTON_COMMAND, dest, 0)
+
+				Sleep(Second)
 			}
-
-			// turn off command light
-			Set_Button_Light(BUTTON_COMMAND, dest, 0)
-
-			Sleep(Second)
-
-		}
 		
-		// sort requests in terms of direction 
-		if dir != elev.direction {
-			Sort_Queue(elev.direction,elev.requests)
+			// sort requests in terms of direction 
+			if dir != elev.direction {
+				Sort_Queue(elev.direction,elev.requests)
+			}
+		} else {
+			Sleep(Second)
 		}
 	}
 }
@@ -159,12 +166,15 @@ func (elev *Elevator) Update_Floor(){
 	for {
 		elev.alignment = Get_Floor_Sensor_Signal()
 		if elev.alignment != -1 && elev.floor != elev.alignment{
-				elev.floor = elev.alignment
+			elev.floor = elev.alignment
+			Set_Floor_Indicator(elev.floor)
 		}
+	Sleep(10*Millisecond)
 	}
 }
 
 func (elev *Elevator) Get_Stats(){
+	Println("Getting stats...")
 	for {
 		Println("Elevator stats for elevator \t", elev.ID)
 		Println("Speed: \t", elev.speed)
@@ -213,7 +223,7 @@ func (elev *Elevator) Poll_Buttons(){
 				}
 			}
 		}
-	
+
 		if (new_button != -1 && new_floor != -1){
 			old_button = new_button
 			old_floor = new_floor
@@ -223,7 +233,7 @@ func (elev *Elevator) Poll_Buttons(){
 		if Get_Stop_Signal() == 1{
 			return
 		}
-		Sleep(Millisecond)
+		Sleep(100*Millisecond)
 	}
 }
 
@@ -231,18 +241,18 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 	// returns 0 on success, -1 failure
 	l := elev.requests
 
-	// if no requests or elevator stopped
-	if l.Len() == 0 || elev.direction == 0 {
-		// list is empty, insert at front
-		_ = l.PushFront(floor)
-		return 0
-	}
-
 	// search list, if requests already exists, do nothing
 	for i:=l.Front(); i!=nil; i=i.Next(){
 		if i.Value.(int) == floor{
 			return 1
 		}
+	}
+
+	// if no requests or elevator stopped
+	if l.Len() == 0 || elev.direction == 0 {
+		// list is empty, insert at front
+		_ = l.PushFront(floor)
+		return 0
 	}
 
 	// return value
@@ -297,7 +307,6 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 
 func (elev *Elevator) Cost(button int, floor int) int{
 
-	// TODO check if direction changes when servicing a floor (open/close doors)
 	// if no requests in queue, or lift is at floor
 	if (elev.direction==stop || elev.requests.Len()==0 || elev.At(floor)){
 		return 0
@@ -346,6 +355,51 @@ func (elev *Elevator) Below(floor int) bool{
 }
 func (elev *Elevator) At(floor int) bool{
 	return floor == elev.floor
+}
+func (elev *Elevator) Stop(){
+	Sleep(StopWait)
+	if elev.direction == up{
+		elev.speed = Set_Speed(downSpeed)
+		elev.speed = Set_Speed(stop)
+	} else if elev.direction == down{
+		elev.speed = Set_Speed(upSpeed)
+		elev.speed = Set_Speed(stop)
+	}
+}
+
+func (elev *Elevator) No_Friends(){
+
+	Println("No Friends established")
+	for {
+		msg := <-elev.Msg
+		substrings := SplitN(msg, ",", -1)		
+		code := substrings[2]
+		args := substrings[3:]
+		if code == "Request"{
+			button,_ := Atoi(args[0])
+			floor,_ := Atoi(args[1]) 
+			elev.Add_Request(button,floor)
+		}
+	}
+}
+
+func (elev *Elevator) Print_Requests(){
+
+	Println("Printing requests...")
+	for {
+		l:= elev.requests
+		if (elev.requests.Len() > 0){
+			Printf("Requests: %d", l.Front().Value.(int))
+			for i:= l.Front(); i!=nil; i=i.Next(){
+				if i==l.Front(){
+					continue
+				}
+				Printf(", %d", i.Value.(int))
+			}
+			Printf("\n")
+		}
+		Sleep(2*Second)
+	}
 }
 
 

@@ -5,19 +5,26 @@ import(
 	."Network"
 	"time"
 	."fmt"
+	"Control"
 )
 
 const (
 	up = 300
 	down = -300
 	stop = 0
+	chanSize = 1024
+	N_FLOORS = 4
+	N_BUTTONS = 3
+	BUTTON_CALL_UP = 0
+	BUTTON_CALL_DOWN = 1
+	BUTTON_COMMAND = 2
 )
 
 func Network_Test(){
 
 	// Run on two machines!
-	to := make(chan string, 1024)
-	from := make(chan string, 1024)
+	to := make(chan string, chanSize)
+	from := make(chan string, chanSize)
 	net := Init_Net(to,from)
 	msg := "Hello World!"
 	var message string
@@ -26,6 +33,21 @@ func Network_Test(){
 	message = <-net.FromNet
 	Println(message)
 }
+	
+func Elevator_Test(){
+	
+	msg := make(chan string, chanSize)
+	alive := make(chan string, chanSize)
+	elev := Control.Init_Elev(msg, alive)
+//	go elev.Get_Stats()
+	go elev.Update_Floor()
+	go elev.No_Friends()
+	go elev.Poll_Buttons()
+	go elev.Print_Requests()
+	go elev.Run()
+
+}
+
 
 func Driver_Test(){
 	Driver.Elev_Init()
@@ -102,7 +124,7 @@ func Driver_Test(){
 	}
 	Driver.Set_Floor_Indicator(Driver.Get_Floor_Sensor_Signal())
 	time.Sleep(time.Millisecond*2000)
-/*
+
 	Println("Testing door open light\n")
 	Driver.Set_Door_Open_Light(1)
 	time.Sleep(time.Millisecond*2000)
@@ -156,7 +178,19 @@ func Driver_Test(){
 	Driver.Set_Button_Light(2,2,0)
 	time.Sleep(time.Millisecond*500)
 	Driver.Set_Button_Light(2,3,0)
-*/
+
+	Println("Testing buttons")
+	for {
+		for floor:=0; floor<N_FLOORS; floor++{
+			for button:=0; button<N_BUTTONS; button++{
+				if Driver.Get_Button_Signal(button, floor) == 1 {
+					Println("Button ",button," was pressed at floor ",floor)
+					time.Sleep(100*time.Millisecond)
+				}
+			}
+		}
+	}
+
 }
 
 

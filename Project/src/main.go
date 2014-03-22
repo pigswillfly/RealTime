@@ -1,18 +1,23 @@
 package main
 
 import (
-	"Testing"
-//	."Control"
-	
+//	"Testing"
+	."Control"
+//	."fmt"
+//	."strconv"
+	."time"
 )
 
 
 func main() {
-//	Testing.Driver_Test()
-//	Testing.Network_Test()
-	Testing.Elevator_Test()	
+//	go Testing.Driver_Test()
+//	go Testing.Network_Test()
+//	go Testing.Elevator_Test()
+	go Init_Control()
 //	Init_Control()
-	for{}
+	for i:=0; i<1000; i++{
+		Sleep(Second)
+	}
 }
 
 

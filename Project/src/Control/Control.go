@@ -42,6 +42,9 @@ func Init_Control() *Control{
 	ctrl.cost_res = -1
 	ctrl.tie_res = -1
 	ctrl.friends = 0
+	ctrl.costs = make(map[int]int)
+	ctrl.tie = make(map[int]int)
+	ctrl.timers = make(map[int]*Timer)
 	
 	// Set up network
 	ctrl.toNet = make(chan string, chanSize)
@@ -63,15 +66,15 @@ func Init_Control() *Control{
 	ctrl.Set_Elev_ID()
 
 	// Set up alive message pulse
-//	go ctrl.Send_Alive_Msg()
-
-	// Start elevator
-//	go ctrl.elev.Run()
-//	go ctrl.elev.Update_Floor()
+	go ctrl.Send_Alive_Msg()
 
 	// Start receiving messages from elevator
-//	go ctrl.Rec_Elev_Msg()
+	go ctrl.Rec_Elev_Msg()
 
+	// Start elevator
+	go ctrl.elev.Update_Floor()
+	go ctrl.elev.Poll_Buttons()
+	go ctrl.elev.Run()
 
 	return ctrl
 }
@@ -112,7 +115,9 @@ func (ctrl *Control) Recieve_Msg(){
 		var i,j int
 
 		if code == "Alive"{
-			ctrl.Rec_Alive_Msg(from_id)
+			if from_id != ctrl.elev.ID{
+				ctrl.Rec_Alive_Msg(from_id)
+			}
 		} else{
 		// check received ID against own
 			if to_id == ctrl.elev.ID{
@@ -180,9 +185,8 @@ func (ctrl *Control) Send_Alive_Msg(){
 
 func (ctrl *Control) Rec_Alive_Msg(id int){
 	
-	go ctrl.elev.Poll_Buttons()
 	ctrl.Update_Elevator_List(id)
-	go ctrl.Reset_Timer(id)
+//	go ctrl.Reset_Timer(id)
 
 }
 
@@ -193,7 +197,9 @@ func (ctrl *Control) Rec_Elev_Msg(){
 		if code == "Request"{
 			ctrl.New_Request(request)
 		} else if code == "Handled"{
-//			ctrl.Send_List(ctrl.elev.other_id)
+			if ctrl.elev.other_id != -1{
+				ctrl.Send_List(ctrl.elev.other_id)
+			}
 		}
 	}
 }
@@ -394,15 +400,17 @@ func (ctrl *Control) Send_List(to int){
 	l := ctrl.elev.requests
 	var send_args []string
 
-	// fill send args will floor requests
-	send_args[0] = Itoa(ctrl.elev.direction)
-	j := 1
-	for i:=l.Front(); i!=nil; i=i.Next(){
-		send_args[j] = Itoa(i.Value.(int))
-		j++
-	}
+	if ctrl.elev.requests.Len() > 0 {
+		// fill send args will floor requests
+		send_args[0] = Itoa(ctrl.elev.direction)
+		j := 1
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			send_args[j] = Itoa(i.Value.(int))
+			j++
+		}
 
-	ctrl.Send_Msg(ctrl.elev.ID, to, "MyList", send_args)
+		ctrl.Send_Msg(ctrl.elev.ID, to, "MyList", send_args)
+	}
 }
 
 
