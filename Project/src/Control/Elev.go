@@ -79,7 +79,7 @@ func (elev *Elevator) Pulse(){
 	for{
 		msg := Itoa(elev.ID)+",0,Alive"
 		elev.Alive <- msg
-		Sleep(5*Second)
+		Sleep(Second)
 	}
 }
 

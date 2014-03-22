@@ -63,7 +63,7 @@ func Init_Control() *Control{
 	Println("Finding friends")
 	go ctrl.Recieve_Msg()
 	// Wait
-	Sleep(10*Second)
+	Sleep(3*Second)
 	Println(Itoa(ctrl.friends)+" friends found")
 
 	// Set own ID
@@ -203,7 +203,7 @@ func (ctrl *Control) Rec_Elev_Msg(){
 		msg := <-ctrl.ElevMsg
 		_, _, code, request := ctrl.Decipher_Msg(msg)
 		if code == "Request"{
-			ctrl.New_Request(request)
+			go ctrl.New_Request(request)
 		} else if code == "Handled"{
 			if ctrl.elev.other_id != -1{
 				ctrl.Send_List(ctrl.elev.other_id)
@@ -219,7 +219,7 @@ func (ctrl *Control) New_Request(request []string){
 		ctrl.elev.Add_Request(button,floor)
 	} else {
 		ctrl.costs[ctrl.elev.ID] = ctrl.elev.Cost(button,floor)
-		ctrl.cost_res = 1
+		ctrl.cost_res = 0
 		l := ctrl.elevators
 		for i:=l.Front(); i!=nil; i=i.Next(){
 			if i.Value.(int) == ctrl.elev.ID {
@@ -235,6 +235,7 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 	for{
 		if ctrl.costs[ctrl.elev.ID] == 0{
 			ctrl.elev.Add_Request(button,floor)	
+			break
 		} else {
 			l := ctrl.elevators
 			best_id := l.Front().Value.(int)
@@ -242,7 +243,7 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 //			best_tie := -1
 			args := make([]string,2)
 			// if all responses received
-			if ctrl.cost_res == ctrl.friends+1{
+			if ctrl.cost_res == ctrl.friends{
 				// find best
 				for i:=l.Front(); i!=nil; i=i.Next(){
 					if i==l.Front(){
