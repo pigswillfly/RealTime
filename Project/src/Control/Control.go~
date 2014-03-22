@@ -1,7 +1,7 @@
 package Control
 
 import(
-//	."fmt"
+	."fmt"
 	."container/list"
 	."strconv"
 	."time"
@@ -14,42 +14,64 @@ const (
 	// for sorting lists
 	minFirst = 1
 	maxFirst = -1
+	chanSize = 1024
 )
 
 type Control struct{
 	elev *Elevator				// elevator
+	ElevMsg chan string		
+	ElevAlive chan string
 	elevators *List				// list of other elevators
-	backup map[int]*List		// backup list of requests of other elev
+	friends int					// number of other elevators active
 	costs map[int]int			// costs of other elevators referenced by id
 	cost_res int				// number of cost responses received
 	tie map[int]int				// for tiebreakers, cost referenced by id
 	tie_res int					// number of tie responses receieved
 	timers map[int]*Timer		// alive msg timers referenced by id
 	net *Network				// network
+	toNet chan string
+	fromNet chan string
+
 }
 
 func Init_Control() *Control{
 
 	// New Control object
 	ctrl := new(Control)
-
+	ctrl.elevators = New()
+	ctrl.cost_res = -1
+	ctrl.tie_res = -1
+	ctrl.friends = 0
+	
 	// Set up network
-	ctrl.net = Init_Net()
+	ctrl.toNet = make(chan string, chanSize)
+	ctrl.fromNet = make(chan string, chanSize)
+	ctrl.net = Init_Net(ctrl.toNet, ctrl.fromNet)
+	Println("Network established")
 
 	// Find which elevators are present ("Alive" messages receiving)
+	Println("Finding friends")
 	go ctrl.Recieve_Msg()
 	// Wait
-	Sleep(Second*5)
+	Sleep(Second)
+	Println(Itoa(ctrl.friends)+" friends found")
 
 	// Set up elevator
-	ctrl.elev = Init_Elev()
+	ctrl.ElevMsg = make(chan string, chanSize)
+	ctrl.ElevAlive = make(chan string, chanSize)
+	ctrl.elev = Init_Elev(ctrl.ElevMsg, ctrl.ElevAlive)
 	ctrl.Set_Elev_ID()
 
 	// Set up alive message pulse
-	go ctrl.Send_Pulse()
+//	go ctrl.Send_Alive_Msg()
 
-	// Start polling buttons
-	go ctrl.Poll_Buttons()
+	// Start elevator
+	go ctrl.elev.Run()
+	go ctrl.elev.Update_Floor()
+
+	// Start receiving messages from elevator
+	go ctrl.Rec_Elev_Msg()
+
 
 	return ctrl
 }
@@ -79,6 +101,8 @@ func (ctrl *Control) Decipher_Msg(msg string) (int, int, string, []string){
 }
 
 func (ctrl *Control) Recieve_Msg(){
+
+	Println("Receiving messages from network")
 	for{
 		// Message format:
 		//	[Sender ID],[Receiver ID],[Code],[Arguments]
@@ -91,7 +115,7 @@ func (ctrl *Control) Recieve_Msg(){
 			ctrl.Rec_Alive_Msg(from_id)
 		} else{
 		// check received ID against own
-			if to_id == ctrl.elev.id{
+			if to_id == ctrl.elev.ID{
 				// action according to code
 				// TODO check state?
 				switch code{
@@ -100,7 +124,7 @@ func (ctrl *Control) Recieve_Msg(){
 						i,_ = Atoi(args[0])
 						j,_ = Atoi(args[1])
 						send_args[0] = Itoa(ctrl.elev.Cost(i,j))
-						ctrl.Send_Msg(ctrl.elev.id, from_id, "MyCost", send_args)
+						ctrl.Send_Msg(ctrl.elev.ID, from_id, "MyCost", send_args)
 
 					case "MyCost":
 						// args -- cost
@@ -113,7 +137,7 @@ func (ctrl *Control) Recieve_Msg(){
 						i,_ = Atoi(args[0])
 						j,_ = Atoi(args[1])				
 						send_args[0] = Itoa(ctrl.elev.Tie_Breaker(i, j))
-						ctrl.Send_Msg(ctrl.elev.id, from_id, "MyTie", send_args)
+						ctrl.Send_Msg(ctrl.elev.ID, from_id, "MyTie", send_args)
 
 					case "MyTie":
 						// args -- tiebreaker result
@@ -124,10 +148,11 @@ func (ctrl *Control) Recieve_Msg(){
 					case "ListPlease":
 						// no args
 						ctrl.Send_List(from_id)
+						ctrl.elev.other_id = from_id
 
 					case "MyList":
 						// args -- direction, then floor requests
-						ctrl.elev.other_dir,_ = Atoi(args[0])
+						ctrl.elev.backup_dir,_ = Atoi(args[0])
 						ctrl.Update_List(from_id, args[1:])
 
 					case "AddFloor":
@@ -142,33 +167,48 @@ func (ctrl *Control) Recieve_Msg(){
 	}
 }	
 
-func (ctrl *Control) Send_Pulse(){
+func (ctrl *Control) Send_Alive_Msg(){
 
+	Println("Begin sending Alive messages to network")
+	go ctrl.elev.Pulse()
 	// send alive message every time available in the alive channel
 	for {
-		msg := <-ctrl.elev.Alive
+		msg := <-ctrl.ElevAlive
 		ctrl.net.ToNet <- msg
 	}
 }
 
 func (ctrl *Control) Rec_Alive_Msg(id int){
-
+	
+	go ctrl.elev.Poll_Buttons()
 	ctrl.Update_Elevator_List(id)
-	// TODO reset timer for that elevator
 	go ctrl.Reset_Timer(id)
 
 }
 
-func (ctrl *Control) Poll_Buttons(){
+func (ctrl *Control) Rec_Elev_Msg(){
 	for{
-		msg := <-ctrl.elev.Msg
-		id, _, code, request := ctrl.Decipher_Msg(msg)
+		msg := <-ctrl.ElevMsg
+		_, _, code, request := ctrl.Decipher_Msg(msg)
 		if code == "Request"{
-			ctrl.cost_res = 0
-			l := ctrl.elevators
-			for i:=l.Front(); i!=nil; i=i.Next(){
-				ctrl.Send_Msg(id, i.Value.(int), "CostPlease", request)
-			}
+			ctrl.New_Request(request)
+		} else if code == "Handled"{
+//			ctrl.Send_List(ctrl.elev.other_id)
+		}
+	}
+}
+
+func (ctrl *Control) New_Request(request []string){
+	button,_ := Atoi(request[0])
+	floor,_ := Atoi(request[1])
+	if ctrl.friends == 0{
+		ctrl.elev.Add_Request(button,floor)
+	} else {
+		ctrl.costs[ctrl.elev.ID] = ctrl.elev.Cost(button,floor)
+		ctrl.cost_res = 1
+		l := ctrl.elevators
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			ctrl.Send_Msg(ctrl.elev.ID, i.Value.(int), "CostPlease", request)
 		}
 	}
 }
@@ -182,7 +222,7 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 
 	for{
 		// if all responses received
-		if ctrl.cost_res == l.Len(){
+		if ctrl.cost_res == ctrl.friends+1{
 			// find best
 			for i:=l.Front(); i!=nil; i=i.Next(){
 				if i==l.Front(){
@@ -203,8 +243,8 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 				args[0] = Itoa(1)
 				args[1] = Itoa(floor)
 				ctrl.tie_res = 0
-				ctrl.Send_Msg(ctrl.elev.id, best_id, "TieBreaker", args)
-				ctrl.Send_Msg(ctrl.elev.id, best_tie, "TieBreaker", args)
+				ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
+				ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
 				for {
 					if ctrl.tie_res == 2 {
 						if ctrl.tie[best_id] > ctrl.tie[best_tie]{
@@ -214,8 +254,8 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 							// round 2
 							args[0] = Itoa(2)
 							ctrl.tie_res = 0
-							ctrl.Send_Msg(ctrl.elev.id, best_id, "TieBreaker", args)
-							ctrl.Send_Msg(ctrl.elev.id, best_tie, "TieBreaker", args)
+							ctrl.Send_Msg(ctrl.elev.ID, best_id, "TieBreaker", args)
+							ctrl.Send_Msg(ctrl.elev.ID, best_tie, "TieBreaker", args)
 							for {
 								if ctrl.tie_res == 2 {
 									if ctrl.tie[best_id] > ctrl.tie[best_tie]{
@@ -231,41 +271,78 @@ func (ctrl *Control) Decide_Elevator(button int, floor int){
 				}
 			}
 			// Send message to selected elevator
-			ctrl.Send_Msg(ctrl.elev.id, best_id, "AddFloor", args)
+			ctrl.Send_Msg(ctrl.elev.ID, best_id, "AddFloor", args)
 			break
 		}	
 	}
 }
 
 func (ctrl *Control) Reset_Timer(id int){
-		ctrl.timers[id] = NewTimer(5*Second)
-		go func(){
-			<-ctrl.timers[id].C
-			ctrl.Timer_Expired(id)
-		}()
-		_ = ctrl.timers[id].Stop()
+	ctrl.timers[id] = NewTimer(5*Second)
+	go func(){
+		<-ctrl.timers[id].C
+		ctrl.Timer_Expired(id)
+	}()
+	ctrl.timers[id].Stop()
 }
 
 func (ctrl *Control) Timer_Expired(id int){
-		// TODO
-		// Timers for detecting dead elevators
-		// 
+
+	// Remove elevator from list of other elevators
+	l := ctrl.elevators
+	for i:=l.Front(); i!=nil; i=i.Next(){
+		if i.Value.(int) == id{
+			l.Remove(i)
+			ctrl.friends -= 1
+		}
+	}
+	// Reset back up elevator
+	ctrl.Set_Elev_Backup_ID()
+
+	// Redistribute requests if matches backup ID
+	// Assume button = direction of elevator
+	if id == ctrl.elev.backup_id{
+		button := ctrl.elev.backup_dir
+		var request []string
+		request[0] = Itoa(button)
+		l = ctrl.elev.backup
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			request[1] = Itoa(i.Value.(int))
+			ctrl.New_Request(request)
+			Sleep(2*Second)
+		}
+	}
 }
 
 func (ctrl *Control) Set_Elev_ID(){
+
 	l := ctrl.elevators
-	ctrl.elev.id = l.Back().Value.(int) + 1
+	if l.Back() == nil{
+		ctrl.elev.ID = 1
+	} else {
+		ctrl.elev.ID = l.Back().Value.(int) + 1
+	}
+	Println("Elevator ID set to: "+Itoa(ctrl.elev.ID))
 }
 
-func (ctrl *Control) Set_Elev_Other_ID(){
+func (ctrl *Control) Set_Elev_Backup_ID(){
 	l := ctrl.elevators
-	if ctrl.elev.id == l.Back().Value.(int){
-		ctrl.elev.other_id = l.Front().Value.(int)
+	if l.Back() == nil{
+		// no other elevators, don't need backup_id
 	} else {
-		for i:=l.Front(); i!=nil; i=i.Next(){
-			if ctrl.elev.id == i.Value.(int) {
-				ctrl.elev.other_id = i.Next().Value.(int)
-			}		
+		if ctrl.elev.ID == l.Back().Value.(int){
+			if ctrl.elev.backup_id != l.Front().Value.(int){
+				// New ID needed
+				ctrl.elev.backup_id = l.Front().Value.(int)
+			}
+		} else {
+			for i:=l.Front(); i!=nil; i=i.Next(){
+				if ctrl.elev.ID == i.Value.(int) {
+					if ctrl.elev.backup_id == i.Next().Value.(int){
+						ctrl.elev.backup_id = i.Next().Value.(int)
+					}
+				}		
+			}
 		}
 	}
 }
@@ -282,14 +359,15 @@ func (ctrl *Control) Update_Elevator_List(id int){
 		}
 	}
 	if found == 0 {
+		ctrl.friends += 1
 		l.PushBack(id)
-		ctrl.Set_Elev_Other_ID()
+		ctrl.Set_Elev_Backup_ID()
 	}
 }
 
 func (ctrl *Control) Update_List(id int, requests []string){
 
-	if ctrl.backup[id] != nil{
+	if ctrl.elev.backup != nil{
 		l := new(List)
 		req := -1
 		for i:= range requests{
@@ -298,6 +376,16 @@ func (ctrl *Control) Update_List(id int, requests []string){
 				l.PushBack(i)
 			}
 		}
+		ctrl.elev.backup = l
+	}
+}
+
+func (ctrl *Control) Request_List(){
+	for {	
+		if ctrl.elev.backup_id != -1{
+			ctrl.Send_Msg(ctrl.elev.ID, ctrl.elev.backup_id, "ListPlease", nil)
+		}
+		Sleep(5*Second)
 	}
 }
 
@@ -307,13 +395,14 @@ func (ctrl *Control) Send_List(to int){
 	var send_args []string
 
 	// fill send args will floor requests
-	j := 0
+	send_args[0] = Itoa(ctrl.elev.direction)
+	j := 1
 	for i:=l.Front(); i!=nil; i=i.Next(){
 		send_args[j] = Itoa(i.Value.(int))
 		j++
 	}
-	ctrl.Send_Msg(ctrl.elev.id, to, "MyList", send_args)
 
+	ctrl.Send_Msg(ctrl.elev.ID, to, "MyList", send_args)
 }
 
 

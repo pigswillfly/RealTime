@@ -8,10 +8,9 @@ import (
 
 
 func main() {
-
-//	Testing.Driver_Test()
-	Testing.Network_Test()	
-//	ctrl := Init_Control()
+	Testing.Driver_Test()
+//	Testing.Network_Test()	
+//	Init_Control()
 	for{}
 }
 

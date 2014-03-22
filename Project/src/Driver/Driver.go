@@ -139,13 +139,13 @@ func Set_Floor_Indicator(floor int) int{
     }
     
     // Binary encoding. One light must always be on
-    if floor & 0x02 == 1{
+    if floor & 0x02 != 0{
         IO_Set_Bit(FLOOR_IND1)
     } else{
         IO_Clear_Bit(FLOOR_IND1)
     }
     
-    if floor & 0x01 == 1{
+    if floor & 0x01 != 0{
         IO_Set_Bit(FLOOR_IND2)
     } else{
         IO_Clear_Bit(FLOOR_IND2)

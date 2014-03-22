@@ -20,19 +20,21 @@ const (
 )
 
 type Elevator struct {
-	id int
-	other_id int				
+	ID int
+	backup_id int	
+	other_id int			
 	speed int			
 	direction int
-	other_dir int
+	backup_dir int
 	floor int
 	alignment int
 	requests *List
+	backup *List
 	Msg chan string
 	Alive chan string	
 }
 
-func Init_Elev() *Elevator {
+func Init_Elev(msg chan string, alive chan string) *Elevator {
 
 	// driver init
 	if Elev_Init() == 0{
@@ -43,9 +45,13 @@ func Init_Elev() *Elevator {
 	elev := new(Elevator)
 
 	// set up parameters
+	elev.ID = -1
+	elev.backup_id = -1
 	elev.speed = Set_Speed(stop)
+
 	elev.direction = 0
 	elev.alignment = Get_Floor_Sensor_Signal()
+
 	if elev.alignment != 0{
 		for{
 			elev.speed = Set_Speed(downSpeed)
@@ -56,27 +62,26 @@ func Init_Elev() *Elevator {
 			}
 		}
 	}
-	elev.requests = new(List)
-	elev.Msg = make(chan string, channelSize)
 
-	go elev.Pulse()
-//	go elev.Get_Stats()
-	go elev.Run()
-	go elev.Poll_Buttons()
+	elev.requests = New()
+	elev.backup = New()
+	elev.Msg = msg
+	elev.Alive = alive
 
 	return elev
 }
 
 func (elev *Elevator) Pulse(){
+	Println("Elevator pulse active")
 	for{
-		msg := Itoa(elev.id)+",0,Alive"
+		msg := Itoa(elev.ID)+",0,Alive"
 		elev.Alive <- msg
 		Sleep(500*Millisecond)
 	}
 }
 
 func (elev *Elevator) Run(){
-	
+	Println("Elevator Running")
 	l := elev.requests
 
 	for{
@@ -93,20 +98,21 @@ func (elev *Elevator) Run(){
 
 		dir := elev.direction
 
+		// if no requests, stop
 		if dest == -1{
-			elev.direction = 0
+			elev.direction = stop
 		// if elevator above destination
 		} else if elev.floor > dest {
 			// set direction down
-			elev.direction = -1 
+			elev.direction = down
 			elev.speed = Set_Speed(downSpeed)
 		// if elevator below destination
 		} else if elev.floor < dest {
 			// set direction up
-			elev.direction = 1
+			elev.direction = up
 			elev.speed = Set_Speed(upSpeed)
 		// if stop signal, stop
-		} else if Get_Stop_Signal() == 1 {
+		} else if Get_Stop_Signal() {
 			elev.speed = Set_Speed(stop)
 			break
 		// otherwise
@@ -115,6 +121,9 @@ func (elev *Elevator) Run(){
 			elev.speed = Set_Speed(stop)
 			// remove request from queue
 			elev.requests.Remove(l.Front())
+			// send control message
+			msg := Itoa(elev.ID)+",0,Handled"
+			elev.Msg <- msg
 
 			// button lights
 			// if destination is lower than next request
@@ -157,7 +166,7 @@ func (elev *Elevator) Update_Floor(){
 
 func (elev *Elevator) Get_Stats(){
 	for {
-		Println("Elevator stats for elevator \t", elev.id)
+		Println("Elevator stats for elevator \t", elev.ID)
 		Println("Speed: \t", elev.speed)
 		Println("Direction: \t", elev.direction)
 		Println("Floor: \t", elev.floor)
@@ -174,6 +183,7 @@ func (elev *Elevator) Poll_Buttons(){
 	new_button := -1
 	new_floor := -1
 
+	Println("Polling buttons started")
 	for {
 		// iterate through all floors & buttons
 		new_button = -1
@@ -191,11 +201,10 @@ func (elev *Elevator) Poll_Buttons(){
 					if button == BUTTON_COMMAND{
 						// add request to queue if command
 						elev.Add_Request(button, floor)
-						// TODO check if added
 					// otherwise send control message
 					} else {
 						// control message
-						msg := Itoa(elev.id)+",0,Request,"+Itoa(button)+","+Itoa(floor)
+						msg := Itoa(elev.ID)+",0,Request,"+Itoa(button)+","+Itoa(floor)
 						elev.Msg <- msg
 					}
 					Println("Button ",button," was pressed at floor ",floor)
@@ -281,6 +290,7 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 	// otherwise, add floor at back of queue
 	if ret < 0 {
 		_ = l.PushBack(floor)
+		ret = 0
 	}
 	return ret
 }
@@ -329,13 +339,13 @@ func (elev *Elevator) Tie_Breaker(round int, floor int) int{
 }
 
 func (elev *Elevator) Above(floor int) bool{
-	return floor < e.floor
+	return floor < elev.floor
 }
 func (elev *Elevator) Below(floor int) bool{
-	return floor > e.floor
+	return floor > elev.floor
 }
 func (elev *Elevator) At(floor int) bool{
-	return floor == e.floor
+	return floor == elev.floor
 }
 
 

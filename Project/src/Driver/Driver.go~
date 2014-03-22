@@ -50,7 +50,7 @@ func Elev_Init() int{
     
 } 
 
-func Set_Speed(speed int){
+func Set_Speed(speed int) int{
 	// TODO
     // To sharply stop elevator, direction bit is toggled before setting speed to 0
     last_speed := 0;
@@ -72,6 +72,8 @@ func Set_Speed(speed int){
     
     // Write new setting to motor
     IO_Write_Analog(MOTOR, int(2048 + 4*math.Abs(float64(speed))))
+	
+	return speed
 }
 
 func Get_Floor_Sensor_Signal() int{
