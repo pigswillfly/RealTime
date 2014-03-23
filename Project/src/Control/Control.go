@@ -91,16 +91,18 @@ func (ctrl *Control) Send_Alive_Msg(){
 	// send alive message every time available in the alive channel
 	for {
 		msg := <-ctrl.ElevAlive
+		Println("Sending alive msg")
 		ctrl.toNet <- msg
 	}
 }
 
 func (ctrl *Control) Rec_Alive_Msg(id int){
 	
+	Println(id, " Alive")
 	ctrl.Update_Friends_List(id)
-	if id == ctrl.elev.backup_id{
-		ctrl.backup_timer = resetTimer
-	}
+//	if id == ctrl.elev.backup_id{
+//		ctrl.backup_timer = resetTimer
+//	}
 
 }
 
@@ -140,8 +142,7 @@ func (ctrl *Control) Recieve_Msg(){
 		var i,j,k int
 
 		if code == "Alive"{
-			ctrl.Rec_Alive_Msg(from_id)
-			//Println("Message received: "+msg)
+			go ctrl.Rec_Alive_Msg(from_id)
 		} else {
 		// check received ID against own
 			if to_id == ctrl.elev.ID{
@@ -172,6 +173,7 @@ func (ctrl *Control) Recieve_Msg(){
 
 					case "MyList":
 						// args -- direction, then floor requests
+						Println("Backup list received")
 						ctrl.elev.backup_dir,_ = Atoi(args[0])
 						go ctrl.Update_Backup_List(from_id, args[1:])
 
@@ -186,11 +188,18 @@ func (ctrl *Control) Recieve_Msg(){
 						// args -- dead elev id
 						i,_ = Atoi(args[0])
 						go ctrl.Timer_Expired(i)
+
+					case "RemBackReq":
+						// args -- floor
+						i,_ = Atoi(args[0])
+						go ctrl.elev.Remove_Backup_Request(i)
+
+					case "AddBackReq":
+						// args -- floor
+						i,_ = Atoi(args[0])
+						go ctrl.elev.Add_Backup_Request(i)
+						
 				
-				}
-			} else if to_id == ctrl.elev.backup_id {
-				if code == "AddFloor"{
-					go ctrl.Request_Backup_List()
 				}
 			}
 		}
@@ -205,7 +214,11 @@ func (ctrl *Control) Rec_Elev_Msg(){
 			go ctrl.New_Request(request)
 		} else if code == "Handled"{
 			if ctrl.elev.other_id != -1{
-				ctrl.Send_List(ctrl.elev.other_id)
+				ctrl.Send_Msg(ctrl.elev.ID, ctrl.elev.other_id, "RemBackReq", request)
+			}
+		} else if code == "Adding"{
+			if ctrl.elev.other_id != -1{
+				ctrl.Send_Msg(ctrl.elev.ID, ctrl.elev.other_id, "AddBackReq", request)
 			}
 		}
 	}
@@ -373,7 +386,6 @@ func (ctrl *Control) Set_Elev_Backup_ID(){
 			}
 		}
 	}
-	
 }
 
 func (ctrl *Control) Update_Friends_List(id int){
@@ -381,6 +393,18 @@ func (ctrl *Control) Update_Friends_List(id int){
 	// Search list of elevators, if not found, add 
 	found := 0
 	l := ctrl.elevators
+	
+	if l.Len() > 0{
+		Printf("Friends list: %d", l.Front().Value.(int))
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			if i==l.Front(){
+				continue
+			}
+			Printf(",%d", i.Value.(int))
+		}
+		Printf("\n")
+	}
+
 	for i:=l.Front(); i!=nil; i=i.Next(){
 		if id == i.Value.(int){
 			found = 1
@@ -394,23 +418,27 @@ func (ctrl *Control) Update_Friends_List(id int){
 		l.PushBack(id)
 		Sort_Queue(minFirst, ctrl.elevators)
 		if ctrl.elev.ID != -1{
-			ctrl.Set_Elev_Backup_ID()
+//			ctrl.Set_Elev_Backup_ID()
 		}
+	}
+
+	if l.Len() > 0{
+		Printf("Friends list: %d", l.Front().Value.(int))
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			if i==l.Front(){
+				continue
+			}
+			Printf(",%d", i.Value.(int))
+		}
+		Printf("\n")
 	}
 }
 
 func (ctrl *Control) Update_Backup_List(id int, requests []string){
 
-	if ctrl.elev.backup != nil{
-		l := new(List)
-		req := -1
-		for i:= range requests{
-			req,_ = Atoi(requests[i])
-			if req > -1 {			
-				l.PushBack(i)
-			}
-		}
-		ctrl.elev.backup = l
+	for i:= range requests{
+		req,_ := Atoi(requests[i])
+		ctrl.elev.Add_Backup_Request(req)
 	}
 }
 
@@ -423,11 +451,12 @@ func (ctrl *Control) Request_Backup_List(){
 func (ctrl *Control) Send_List(to int){
 
 	if ctrl.elev.requests.Len() > 0 {
-//		r:= <- ctrl.elev.req_ready
+
 		l := ctrl.elev.requests
 		send_args := make([]string,ctrl.elev.requests.Len()+1)
 		// fill send args will floor requests
 		send_args[0] = Itoa(ctrl.elev.direction)
+//		r:= <- ctrl.elev.req_ready
 		j := 1
 		for i:=l.Front(); i!=nil; i=i.Next(){
 			send_args[j] = Itoa(i.Value.(int))

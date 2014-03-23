@@ -34,6 +34,8 @@ type Elevator struct {
 	req_ready chan int
 	req_done chan int
 	backup *List
+	back_ready chan int
+	back_done chan int
 	Msg chan string
 	Alive chan string	
 }
@@ -72,6 +74,10 @@ func Init_Elev(msg chan string, alive chan string) *Elevator {
 	elev.req_done = make(chan int)
 	go elev.List_Channel()
 	elev.req_done <- 1
+	elev.back_ready = make(chan int)
+	elev.back_done = make(chan int)
+	go elev.Backup_Channel()
+	elev.back_done <- 1
 	elev.Msg = msg
 	elev.Alive = alive
 	return elev
@@ -125,7 +131,7 @@ func (elev *Elevator) Run(){
 				elev.requests.Remove(l.Front())	
 				elev.req_done <- r
 				// send control message
-				go elev.Send_Handled_Msg()
+				go elev.Send_Handled_Msg(Get_Floor_Sensor_Signal())
 
 				// cpen door
 				Set_Door_Open_Light(1)
@@ -160,11 +166,6 @@ func (elev *Elevator) Run(){
 		}
 		Sleep(10*Millisecond)
 	}
-}
-
-func (elev *Elevator) Send_Handled_Msg(){
-	msg := Itoa(elev.ID)+",0,Handled"
-	elev.Msg <- msg
 }
 
 func (elev *Elevator) Update_Floor(){
@@ -246,7 +247,8 @@ func (elev *Elevator) Handle_Request(button int, floor int){
 }
 
 func (elev *Elevator) Add_Request(button int, floor int) int {
-	// returns 0 on success, -1 failure
+
+	go elev.Send_Adding_Msg(floor)
 //	Println("Adding request, waiting")
 	r := <- elev.req_ready
 //	Println("Adding request, going")
@@ -321,7 +323,42 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 	
 	elev.req_done <- r
 //	Println("Adding request returning ", ret)
+
 	return ret
+}
+
+func (elev *Elevator) Send_Adding_Msg(floor int){
+	msg := "0,0,Adding,"+Itoa(floor)
+	elev.Msg <- msg
+}
+
+func (elev *Elevator) Send_Handled_Msg(floor int){
+	msg := "0,0,Handled,"+Itoa(floor)
+	elev.Msg <- msg
+}
+
+func (elev *Elevator) Add_Backup_Request(floor int){
+
+	r := <- elev.back_ready
+
+	l := elev.backup
+	_ = l.PushBack(floor)
+	
+	elev.back_done <- r
+}
+
+func (elev *Elevator) Remove_Backup_Request(floor int){
+	r := <- elev.back_ready
+
+	l := elev.backup
+	for i:=l.Front(); i!=nil; i=i.Next(){
+		if i.Value.(int) == floor{
+			l.Remove(i)
+			break
+		}
+	}
+	
+	elev.back_done <- r
 }
 
 func (elev *Elevator) Cost(button int, floor int) int{
@@ -395,6 +432,12 @@ func (elev *Elevator) Stop(){
 func (elev *Elevator) List_Channel(){
 	for{
 		elev.req_ready <- <- elev.req_done
+	}
+}
+
+func (elev *Elevator) Backup_Channel(){
+	for{
+		elev.back_ready <- <- elev.back_done
 	}
 }
 
