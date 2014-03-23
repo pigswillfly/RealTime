@@ -176,6 +176,13 @@ func (elev *Elevator) Update_Floor(){
 		if elev.alignment != -1 && elev.floor != elev.alignment{
 			elev.floor = elev.alignment
 			Set_Floor_Indicator(elev.floor)
+			if elev.floor == N_FLOORS-1{
+				elev.Stop()
+				elev.direction = down
+			} else if elev.floor == 0{
+				elev.Stop()
+				elev.direction = up
+			}
 		}
 	Sleep(10*Millisecond)
 	}
@@ -319,29 +326,33 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 
 func (elev *Elevator) Cost(button int, floor int) int{
 
-	// if no requests in queue, or lift is at floor
-	if (elev.direction==stop || elev.requests.Len()==0 || elev.At(floor)){
+	// if lift is at floor
+	if elev.At(floor){
 		return 0
+
+	// if no requests in queue
+	} else if (elev.requests.Len()==0) {
+		return 1
 
 	// if elevator is passing floor and request is in same direction
 	} else if (elev.direction==down && elev.Above(floor) && button==down) ||
 		(elev.direction==up && elev.Below(floor) && button==up){
-		return 1
+		return 2
 
 	// if elevator is passing floor and request is in opposite direction
 	} else if (elev.direction==down && elev.Above(floor) && button==up) ||
 		(elev.direction==up && elev.Below(floor) && button==down){
-		return 2
+		return 3
 
 	// if request floor and direction are opposite to elevator direction
 	} else if (elev.direction==down && elev.Below(floor) && button==up) ||
 		(elev.direction==up && elev.Above(floor) && button==down){
-		return 3
+		return 4
 
 	// if request and elevator direction are same but floor already passed
 	} else if (elev.direction==down && elev.Below(floor) && button==down) ||
 		(elev.direction==up && elev.Above(floor) && button==up){
-		return 4
+		return 5
 
 	// error
 	} else {
