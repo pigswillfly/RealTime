@@ -376,12 +376,6 @@ func (ctrl *Control) Set_Elev_Backup_ID(){
 	if ctrl.friends == 0 || ctrl.elevators.Len() == 1{
 		// no other elevators, don't need backup_id
 		Println("No backup ID needed, no friends")
-	} else if ctrl.friends == 1{
-		if ctrl.elev.ID == ctrl.elevators.Front().Value.(int){
-			ctrl.elev.backup_id = ctrl.elevators.Back().Value.(int)
-		} else if ctrl.elev.ID == ctrl.elevators.Back().Value.(int){
-			ctrl.elev.backup_id = ctrl.elevators.Front().Value.(int)
-		}
 	} else {
 		// set backup id to next one in list
 		l := ctrl.elevators

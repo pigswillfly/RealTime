@@ -9,7 +9,7 @@ import (
 const N_BUTTONS = 3
 const N_FLOORS = 4
 
-var lamp_channel_matrix Helpers.Matrix
+var light_channel_matrix Helpers.Matrix
 var button_channel_matrix Helpers.Matrix
 
 const (
@@ -25,7 +25,7 @@ func Elev_Init() int{
     }
 
 	// Initialize matrices
-	lamp_channel_matrix = Helpers.New_Matrix(N_FLOORS, N_BUTTONS)
+	light_channel_matrix = Helpers.New_Matrix(N_FLOORS, N_BUTTONS)
 	button_channel_matrix = Helpers.New_Matrix(N_FLOORS, N_BUTTONS)
 	Matrix_Init()
     
@@ -177,12 +177,16 @@ func Set_Button_Light(button int, floor int, value int) int{
     }
     
     if value == 1{
-        IO_Set_Bit(lamp_channel_matrix.Get(floor,button))
+        IO_Set_Bit(light_channel_matrix.Get(floor,button))
     } else{
-        IO_Clear_Bit(lamp_channel_matrix.Get(floor,button))    
+        IO_Clear_Bit(light_channel_matrix.Get(floor,button))    
     }
 
 	return 0
+}
+
+func Get_Button_Light(button int, floor int) bool{
+	return IO_Read_Bit(light_channel_matrix.Get(floor,button))>0
 }
 
 func Set_Stop_Light(value int){
@@ -204,18 +208,18 @@ func Set_Door_Open_Light(value int){
 
 func Matrix_Init(){
 	
-	lamp_channel_matrix.Set(0,0,LIGHT_UP1)
-	lamp_channel_matrix.Set(0,1,LIGHT_DOWN1)
-	lamp_channel_matrix.Set(0,2,LIGHT_COMMAND1)
-	lamp_channel_matrix.Set(1,0,LIGHT_UP2)
-	lamp_channel_matrix.Set(1,1,LIGHT_DOWN2)
-	lamp_channel_matrix.Set(1,2,LIGHT_COMMAND2)
-	lamp_channel_matrix.Set(2,0,LIGHT_UP3)
-	lamp_channel_matrix.Set(2,1,LIGHT_DOWN3)
-	lamp_channel_matrix.Set(2,2,LIGHT_COMMAND3)
-	lamp_channel_matrix.Set(3,0,LIGHT_UP4)
-	lamp_channel_matrix.Set(3,1,LIGHT_DOWN4)
-	lamp_channel_matrix.Set(3,2,LIGHT_COMMAND4)	
+	light_channel_matrix.Set(0,0,LIGHT_UP1)
+	light_channel_matrix.Set(0,1,LIGHT_DOWN1)
+	light_channel_matrix.Set(0,2,LIGHT_COMMAND1)
+	light_channel_matrix.Set(1,0,LIGHT_UP2)
+	light_channel_matrix.Set(1,1,LIGHT_DOWN2)
+	light_channel_matrix.Set(1,2,LIGHT_COMMAND2)
+	light_channel_matrix.Set(2,0,LIGHT_UP3)
+	light_channel_matrix.Set(2,1,LIGHT_DOWN3)
+	light_channel_matrix.Set(2,2,LIGHT_COMMAND3)
+	light_channel_matrix.Set(3,0,LIGHT_UP4)
+	light_channel_matrix.Set(3,1,LIGHT_DOWN4)
+	light_channel_matrix.Set(3,2,LIGHT_COMMAND4)	
 
 	button_channel_matrix.Set(0,0,FLOOR_UP1)
 	button_channel_matrix.Set(0,1,FLOOR_DOWN1)

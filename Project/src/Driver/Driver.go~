@@ -185,6 +185,10 @@ func Set_Button_Light(button int, floor int, value int) int{
 	return 0
 }
 
+func Get_Button_Light(button int, floor int) bool{
+	return IO_Read_Bit(lamp_channel_matrix.Get(floor,button))>0
+}
+
 func Set_Stop_Light(value int){
     if value == 1{
         IO_Set_Bit(LIGHT_STOP)

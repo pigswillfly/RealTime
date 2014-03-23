@@ -105,7 +105,6 @@ func (elev *Elevator) Run(){
 			r:= <- elev.req_ready
 			dest = elev.requests.Front().Value.(int)
 			elev.req_done <- r
-
 			// if no requests, stop
 			if dest == -1{
 				elev.direction = stop
@@ -139,7 +138,7 @@ func (elev *Elevator) Run(){
 				Set_Door_Open_Light(1)
 
 				// button lights
-				if elev.requests.Len() > 0{
+				if elev.requests.Len() > 0 && Get_Button_Light(BUTTON_CALL_UP,dest) != Get_Button_Light(BUTTON_CALL_DOWN,dest){
 					// if destination is lower than next request
 					if dest < elev.requests.Front().Value.(int) {
 						Set_Button_Light(BUTTON_CALL_UP, dest, 0)
@@ -152,20 +151,21 @@ func (elev *Elevator) Run(){
 					Set_Button_Light(BUTTON_CALL_UP, dest, 0)
 					Set_Button_Light(BUTTON_CALL_DOWN, dest, 0)
 				}
-
+				
 				// turn off command light
 				Set_Button_Light(BUTTON_COMMAND, dest, 0)
 				Sleep(Second)
 				// close door
 				Set_Door_Open_Light(0)
 			}
+			// sort requests in terms of direction 
+			if dir != elev.direction && dir != 0 {
+				r := <- elev.req_ready
+				Sort_Queue(elev.direction,elev.requests)
+				elev.req_done <- r
+			}
 		}
-		// sort requests in terms of direction 
-		if dir != elev.direction && dir != 0 {
-			r := <- elev.req_ready
-			Sort_Queue(elev.direction,elev.requests)
-			elev.req_done <- r
-		}
+
 		Sleep(10*Millisecond)
 	}
 }
@@ -251,9 +251,8 @@ func (elev *Elevator) Handle_Request(button int, floor int){
 func (elev *Elevator) Add_Request(button int, floor int) int {
 
 	go elev.Send_Adding_Msg(floor)
-//	Println("Adding request, waiting")
+
 	r := <- elev.req_ready
-//	Println("Adding request, going")
 
 	l := elev.requests
 
@@ -261,7 +260,7 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 	for i:=l.Front(); i!=nil; i=i.Next(){
 		if i.Value.(int) == floor{
 			elev.req_done <- r
-//			Println("Adding request returning 1")
+
 			return 1
 		}
 	}
@@ -271,7 +270,7 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 		// list is empty, insert at front
 		_ = l.PushFront(floor)
 		elev.req_done <- r
-//		Println("Adding request returning 0")
+
 		return 0
 	}
 
@@ -322,9 +321,11 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 		_ = l.PushBack(floor)
 		ret = 2
 	}
+
+	// Re-sort
+//	Sort_Queue(elev.direction,elev.requests)
 	
 	elev.req_done <- r
-//	Println("Adding request returning ", ret)
 
 	return ret
 }
