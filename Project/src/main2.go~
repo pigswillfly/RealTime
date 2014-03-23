@@ -1,8 +1,8 @@
-package main
+package main2
 
 import (
 //	"Testing"
-	."Control"
+//	."Control"
 //	."fmt"
 //	."strconv"
 	."time"
@@ -11,16 +11,14 @@ import (
 
 
 func main() {
-	Elev_Init()
-	Set_Speed(0)
 //	go Testing.Driver_Test()
 //	go Testing.Network_Test()
 //	go Testing.Elevator_Test()
-	go Init_Control()
-
+//	go Init_Control()
+//	Init_Control()
+	Elev_Init()
+	Set_Speed(0)
 	for i:=0; i<1000; i++{
 		Sleep(Second)
 	}
 }
-
-

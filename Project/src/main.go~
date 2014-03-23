@@ -1,8 +1,8 @@
 package main
 
 import (
-//	"Testing"
-	."Control"
+	"Testing"
+//	."Control"
 //	."fmt"
 //	."strconv"
 	."time"

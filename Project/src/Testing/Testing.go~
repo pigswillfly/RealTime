@@ -41,12 +41,21 @@ func Elevator_Test(){
 	msg := make(chan string, chanSize)
 	alive := make(chan string, chanSize)
 	elev := Control.Init_Elev(msg, alive)
+	Println("0")
 //	go elev.Get_Stats()
+	Println("1")
 	go elev.Update_Floor()
+	Println("2")
 	go elev.No_Friends()
+	Println("3")
+//	go elev.List_Channel()
+	Println("4")
 	go elev.Poll_Buttons()
+	Println("5")
 	go elev.Print_Requests()
+	Println("6")	
 	go elev.Run()
+	Println("7")
 }
 
 func Driver_Test(){

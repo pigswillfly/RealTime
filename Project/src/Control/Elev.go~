@@ -345,7 +345,7 @@ func (elev *Elevator) Cost(button int, floor int) int{
 
 	// error
 	} else {
-		return 10
+		return -1
 	}
 }
 
