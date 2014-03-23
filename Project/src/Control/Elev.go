@@ -7,7 +7,6 @@ import(
 	."container/list"
 	."strconv"
 	."Helpers"
-	."math"
 	."strings"
 )
 
@@ -80,6 +79,9 @@ func Init_Elev(msg chan string, alive chan string) *Elevator {
 	elev.back_done <- 1
 	elev.Msg = msg
 	elev.Alive = alive
+	go elev.Detect_New_Other_ID()
+	go elev.Detect_New_Backup_ID()
+
 	return elev
 }
 
@@ -327,6 +329,43 @@ func (elev *Elevator) Add_Request(button int, floor int) int {
 	return ret
 }
 
+func (elev *Elevator) Detect_New_Other_ID(){
+	
+	prev := elev.other_id
+	for {
+		if elev.other_id != prev{
+			elev.New_Other_ID()
+			prev = elev.other_id
+		}
+		Sleep(2*Second)
+	}
+}
+
+func (elev *Elevator) Detect_New_Backup_ID(){
+	
+	prev := elev.backup_id
+	for {
+		if elev.backup_id != prev{
+			elev.Send_New_Backup_Msg()	
+			prev = elev.backup_id
+		}
+		Sleep(Second)
+	}
+}
+
+func (elev *Elevator) New_Other_ID(){
+
+	if elev.requests.Len() > 0{
+		r := <-elev.req_ready
+	
+		l := elev.requests
+		for i:=l.Front(); i!=nil; i=i.Next(){
+			elev.Send_Adding_Msg(i.Value.(int))
+		}
+		elev.req_done <- r
+	}
+}
+
 func (elev *Elevator) Send_Adding_Msg(floor int){
 	msg := "0,0,Adding,"+Itoa(floor)
 	elev.Msg <- msg
@@ -334,6 +373,11 @@ func (elev *Elevator) Send_Adding_Msg(floor int){
 
 func (elev *Elevator) Send_Handled_Msg(floor int){
 	msg := "0,0,Handled,"+Itoa(floor)
+	elev.Msg <- msg
+}
+
+func (elev *Elevator) Send_New_Backup_Msg(){
+	msg := "0,0,NewBackup"
 	elev.Msg <- msg
 }
 
@@ -394,16 +438,6 @@ func (elev *Elevator) Cost(button int, floor int) int{
 	// error
 	} else {
 		return 10
-	}
-}
-
-func (elev *Elevator) Tie_Breaker(round int, floor int) int{
-	if round==1{
-		return elev.requests.Len()
-	} else if round==2{
-		return int(Abs(float64(elev.floor - floor)))
-	} else {
-		return 100
 	}
 }
 
